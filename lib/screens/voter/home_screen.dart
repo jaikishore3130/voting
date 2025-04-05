@@ -40,15 +40,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   Future<void> _fetchNews() async {
-    final url = Uri.parse("https://newsapi.org/v2/top-headlines?country=in&category=politics&apiKey=a3f1989aed15478ba01410509c7a239f");
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      setState(() {
-        _newsArticles = data['articles'].take(5).toList();
-      });
+    final url = Uri.parse("https://newsapi.org/v2/everything?q=politics+india&language=en&sortBy=publishedAt&apiKey=a3f1989aed15478ba01410509c7a239f");
+    try {
+      final response = await http.get(url);
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['articles'] != null) {
+          setState(() {
+            _newsArticles = List.from(data['articles']).take(5).toList();
+          });
+        } else {
+          print("No articles in response.");
+        }
+      } else {
+        print("Error from NewsAPI: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Exception: $e");
     }
   }
+
+
+
   int _calculateAgeFromDob(String dobString) {
     try {
       final dob = DateTime.parse(dobString);
@@ -69,6 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: EdgeInsets.all(16),
       child: Column(
         children: [
+
+
           _profileData == null
               ? CircularProgressIndicator()
               : Card(
@@ -84,15 +102,27 @@ class _HomeScreenState extends State<HomeScreen> {
               isThreeLine: true,
             ),
           ),
+
           SizedBox(height: 20),
           Text("Latest Political News", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           SizedBox(height: 10),
           ..._newsArticles.map((article) => Card(
+
             child: ListTile(
               title: Text(article['title'] ?? ""),
               subtitle: Text(article['description'] ?? ""),
             ),
           )),
+          _newsArticles.isEmpty
+              ? Text("No news available.")
+              : Column(
+            children: _newsArticles.map((article) => Card(
+              child: ListTile(
+                title: Text(article['title'] ?? ""),
+                subtitle: Text(article['description'] ?? ""),
+              ),
+            )).toList(),
+          ),
         ],
       ),
     );
