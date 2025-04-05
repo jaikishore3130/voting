@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:twilio_flutter/twilio_flutter.dart';
-import 'package:voting/screens/Voter_dashboard.dart'; // Import Voter Dashboard screen
+import 'package:voting/screens/voter/voter_dashboard.dart';
 
 class VoterLoginScreen extends StatefulWidget {
   @override
@@ -98,8 +98,17 @@ class _VoterLoginState extends State<VoterLoginScreen> {
     _otpControllers.map((controller) => controller.text).join();
     if (enteredOTP == generatedOtp) {
       _showMessage("Login Successful! Redirecting...");
-      Navigator.push(
-          context, MaterialPageRoute(builder: (context) => VoterDashboard()));
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VoterDashboard(
+            aadhaarNumber: _aadhaarController.text.trim(),
+          ),
+        ),
+      );
+
+
+
     } else {
       _showMessage("Invalid OTP! Try again.");
     }
