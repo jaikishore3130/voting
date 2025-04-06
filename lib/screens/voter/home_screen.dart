@@ -116,21 +116,55 @@ class _HomeScreenState extends State<HomeScreen> {
       final encryptedBytes = response.bodyBytes;
 
       final key = encrypt.Key.fromUtf8('28212821282128212821282128212821');
-      final iv = encrypt.IV.fromUtf8('3031303130313031');  // Should match your encryption setup
+      final iv = encrypt.IV.fromUtf8('3031303130313031'); // Same IV
 
-      final encrypter = encrypt.Encrypter(encrypt.AES(key));
+      final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
       final decrypted = encrypter.decryptBytes(
         encrypt.Encrypted(encryptedBytes),
         iv: iv,
       );
-      print("Decrypted byte length: ${decrypted.length}");
 
+      print("✅ Decrypted length: ${decrypted.length}");
+      print("✅ Magic bytes: ${decrypted.sublist(0, 3)}"); // Should print [255, 216, 255]
 
       return MemoryImage(Uint8List.fromList(decrypted));
     } else {
-      throw Exception('Image not found');
+      throw Exception('❌ Failed to load image');
     }
   }
+  String capitalize(String? input) {
+    if (input == null || input.isEmpty) return 'N/A';
+    return input
+        .toLowerCase()
+        .split(' ')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+  Widget _buildInfoRow(String title, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "$title: ",
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              capitalize(value?.toString()),
+              style: TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -143,30 +177,56 @@ class _HomeScreenState extends State<HomeScreen> {
               : Card(
             elevation: 4,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
-            child: ListTile(
-              leading: FutureBuilder<ImageProvider>(
-                future:
-                _getDecryptedProfileImage(widget.aadhaarNumber),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return CircleAvatar(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return CircleAvatar(child: Icon(Icons.error));
-                  } else {
-                    return CircleAvatar(backgroundImage: snapshot.data);
-                  }
-                },
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Column(
+                children: [
+                  FutureBuilder<ImageProvider>(
+                    future: _getDecryptedProfileImage(widget.aadhaarNumber),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return CircleAvatar(
+                          radius: 60,
+                          child: CircularProgressIndicator(),
+                        );
+                      } else if (snapshot.hasError) {
+                        return CircleAvatar(
+                          radius: 60,
+                          child: Icon(Icons.error),
+                        );
+                      } else {
+                        return CircleAvatar(
+                          radius: 60,
+                          backgroundImage: snapshot.data,
+                        );
+                      }
+                    },
+                  ),
+                  SizedBox(height: 15),
+                  Text(
+                    capitalize(_profileData!['name']),
+
+
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Divider(height: 30),
+                  _buildInfoRow("Father's Name", _profileData!['father_name']),
+                  _buildInfoRow("Phone", _profileData!['phone'].toString()),
+
+                  _buildInfoRow("Age", _calculateAgeFromDob(_profileData!['dob']).toString()),
+                  _buildInfoRow("Constituency", _profileData!['constituency']),
+                  _buildInfoRow("Address", _profileData!['address']),
+
+                ],
               ),
-              title: Text(_profileData!['name'] ?? "Name"),
-              subtitle: Text(
-                "Age: ${_calculateAgeFromDob(_profileData!['dob'])}\n"
-                    "Constituency: ${_profileData!['constituency'] ?? ''}",
-              ),
-              isThreeLine: true,
             ),
           ),
+
           SizedBox(height: 20),
           Text(
             "Latest Political News",
