@@ -40,7 +40,8 @@ dependencies:
   camera: ^0.10.5+5   # For face recognition
   http: ^0.13.6       # For API requests
   shared_preferences: ^2.2.0
-  fluttertoast: ^8.2.4 # For storing login sessions
+  fluttertoast: ^8.2.4
+  encrypt: ^5.0.3 # For storing login sessions
 
   cupertino_icons: ^1.0.8
   twilio_flutter: ^0.0.9
