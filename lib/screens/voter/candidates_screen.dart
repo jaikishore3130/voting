@@ -1,6 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:ui';
 
 class CandidatesScreen extends StatefulWidget {
   @override
@@ -9,73 +9,48 @@ class CandidatesScreen extends StatefulWidget {
 
 class _CandidatesScreenState extends State<CandidatesScreen> with SingleTickerProviderStateMixin {
   TabController? _tabController;
+
   String? selectedElection;
-  List<Map<String, dynamic>> candidates = [];
+  String? selectedState;
+  String? selectedParty;
+
+  List<Map<String, dynamic>> allCandidates = [];
+  List<Map<String, dynamic>> displayedCandidates = [];
+
   List<Map<String, dynamic>> parties = [];
+  List<String> allStates = [];
+
+  int candidatesToShow = 20;
+  bool _isLoadingMore = false;
+  bool _hasMoreCandidates = true;
+  int _candidatesLimit = 20; // Number of candidates to load per "Load More"
+
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-
     _fetchParties();
+    _fetchStates();
   }
 
+  Future<void> _fetchStates() async {
+    final snapshot = await FirebaseFirestore.instance.collection('LOK_SABHA').get();
+    Set<String> statesSet = {};
 
-
-  Future<void> _fetchLokSabhaCandidates() async {
-    List<Map<String, dynamic>> fetchedCandidates = [];
-
-    try {
-      final partySnapshots = await FirebaseFirestore.instance.collection('LOK_SABHA').get();
-
-      for (var partyDoc in partySnapshots.docs) {
-        final partyName = partyDoc.id;
-
-        final candidateSnapshots = await FirebaseFirestore.instance
-            .collection('LOK_SABHA')
-            .doc(partyName)
-            .collection('candidates')
-            .get();
-
-        for (var candidateDoc in candidateSnapshots.docs) {
-          final data = candidateDoc.data();
-
-          // Organize fields in a consistent, readable format with fallbacks
-          final candidateData = {
-            'party': partyName,
-            'name': data['name'] ?? 'Unnamed',
-            'age': data['age'] ?? 'N/A',
-            'gender': data['gender'] ?? 'N/A',
-            'education': data['education'] ?? 'N/A',
-            'criminal_history': data['criminal_history'] ?? '0',
-            'assets': data['assets'] ?? 'N/A',
-            'liabilities': data['liabilities'] ?? 'N/A',
-            'votes_received': data['votes_received'] ?? 0,
-            'winner': data['winner'] ?? false,
-            'email': data['email'] ?? 'N/A',
-            'phone': data['phone'] ?? 'N/A',
-
-            'state': data['state'] ?? 'Unknown',
-            'constituency': data['constituency'] ?? 'Unknown',
-            'permanent_address': data['permanent_address'] ?? 'N/A',
-            'manifesto': data['manifesto'] ?? '',
-            'imageUrl': data['profile_image'] ?? '',
-          };
-
-          fetchedCandidates.add(candidateData);
+    for (var partyDoc in snapshot.docs) {
+      final candidateSnapshots = await partyDoc.reference.collection('candidates').get();
+      for (var doc in candidateSnapshots.docs) {
+        final state = doc['state'];
+        if (state != null && state.toString().trim().isNotEmpty) {
+          statesSet.add(state);
         }
       }
-
-      // Sort candidates alphabetically by name
-      fetchedCandidates.sort((a, b) => a['name'].toString().compareTo(b['name'].toString()));
-
-      setState(() {
-        candidates = fetchedCandidates;
-      });
-    } catch (e) {
-      print("❌ Error fetching candidates: $e");
     }
+
+    setState(() {
+      allStates = statesSet.toList()..sort();
+    });
   }
 
   Future<void> _fetchParties() async {
@@ -97,6 +72,349 @@ class _CandidatesScreenState extends State<CandidatesScreen> with SingleTickerPr
     } catch (e) {
       print("❌ Error fetching parties: $e");
     }
+  }
+
+  Future<void> _fetchCandidates() async {
+    if (selectedElection == null || selectedElection != 'Lok Sabha') return;
+
+    List<Map<String, dynamic>> fetchedCandidates = [];
+
+    final snapshot = await FirebaseFirestore.instance.collection('LOK_SABHA').get();
+
+    for (var partyDoc in snapshot.docs) {
+      final partyName = partyDoc.id;
+
+      // Filter by selected party
+      if (selectedParty != null && selectedParty != partyName) continue;
+
+      final candidateSnapshots = await FirebaseFirestore.instance
+          .collection('LOK_SABHA')
+          .doc(partyName)
+          .collection('candidates')
+          .get();
+
+      for (var doc in candidateSnapshots.docs) {
+        final data = doc.data();
+
+        if (selectedState != null && selectedState != data['state']) continue;
+
+        fetchedCandidates.add({
+          'party': partyName,
+          'name': data['name'] ?? 'Unnamed',
+          'age': data['age'] ?? 'N/A',
+          'gender': data['gender'] ?? 'N/A',
+          'education': data['education'] ?? 'N/A',
+          'criminal_history': data['criminal_history'] ?? '0',
+          'assets': data['assets'] ?? 'N/A',
+          'liabilities': data['liabilities'] ?? 'N/A',
+          'votes_received': data['votes_received'] ?? 0,
+          'winner': data['winner'] ?? false,
+          'email': data['email'] ?? 'N/A',
+          'phone': data['phone'] ?? 'N/A',
+          'user_id': data['user_id'] ?? '',
+          'state': data['state'] ?? 'Unknown',
+          'constituency': data['constituency'] ?? 'Unknown',
+          'permanent_address': data['permanent_address'] ?? 'N/A',
+          'manifesto': data['manifesto'] ?? '',
+          'imageUrl': data['profile_image'] ?? '',
+        });
+      }
+    }
+
+    fetchedCandidates.sort((a, b) => a['name'].toString().compareTo(b['name'].toString()));
+
+    setState(() {
+      allCandidates = fetchedCandidates;
+      displayedCandidates = allCandidates.take(candidatesToShow).toList();
+    });
+  }
+
+  void _loadMoreCandidates() async {
+    if (_isLoadingMore || !_hasMoreCandidates) return;
+
+    setState(() => _isLoadingMore = true);
+
+    await Future.delayed(Duration(milliseconds: 300)); // optional UI delay
+
+    final nextCandidates = allCandidates
+        .skip(displayedCandidates.length)
+        .take(_candidatesLimit)
+        .toList();
+
+    setState(() {
+      displayedCandidates.addAll(nextCandidates);
+      _isLoadingMore = false;
+      _hasMoreCandidates = displayedCandidates.length < allCandidates.length;
+    });
+  }
+
+
+  void _resetFiltersAndCandidates() {
+    candidatesToShow = 20;
+    allCandidates.clear();
+    displayedCandidates.clear();
+  }
+
+  Widget _dropdownWrapper({required String title, required List<String> items, String? selected, required Function(String?) onChanged}) {
+    return DropdownButtonFormField<String>(
+      value: selected,
+      decoration: InputDecoration(labelText: title, border: OutlineInputBorder()),
+      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredStates = selectedParty == null
+        ? allStates
+        : _getStatesByParty(selectedParty!);
+
+    final filteredParties = selectedState == null
+        ? parties
+        : _getPartiesByState(selectedState!);
+
+    return Column(
+      children: [
+        Container(
+          color: Colors.blue,
+          child: TabBar(
+            controller: _tabController,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
+            tabs: const [
+              Tab(text: "Candidates"),
+              Tab(text: "Parties"),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Candidates Tab
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    _dropdownWrapper(
+                      title: "Select Election",
+                      items: ["Lok Sabha"],
+                      selected: selectedElection,
+                      onChanged: (val) {
+                        setState(() {
+                          selectedElection = val;
+                          selectedState = null;
+                          selectedParty = null;
+                          _resetFiltersAndCandidates();
+                          _fetchCandidates();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        // STATE DROPDOWN WITH CLEAR ICON
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            value: selectedState,
+                            decoration: InputDecoration(
+                              labelText: 'Select State',
+                              suffixIcon: selectedState != null
+                                  ? IconButton(
+                                icon: Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    selectedState = null;
+                                    _resetFiltersAndCandidates();
+                                    _fetchCandidates();
+                                  });
+                                },
+                              )
+                                  : null,
+                            ),
+                            items: filteredStates.map((state) {
+                              return DropdownMenuItem<String>(
+                                value: state,
+                                child: Text(state, overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                selectedState = val;
+                                _resetFiltersAndCandidates();
+                                _fetchCandidates();
+                              });
+                            },
+                          ),
+                        ),
+
+
+                        SizedBox(width: 10),
+
+                        // PARTY DROPDOWN WITH CLEAR ICON
+                        Expanded(
+                          child: Stack(
+                            alignment: Alignment.centerRight,
+                            children: [
+                              DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                decoration: InputDecoration(labelText: 'Select Party'),
+                                value: selectedParty,
+                                items: filteredParties.map((party) {
+                                  return DropdownMenuItem<String>(
+                                    value: party['name'],
+                                    child: Text(party['name'], overflow: TextOverflow.ellipsis),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    selectedParty = val;
+                                    _resetFiltersAndCandidates();
+                                    _fetchCandidates();
+                                  });
+                                },
+                              ),
+                              if (selectedParty != null)
+                                Positioned(
+                                  right: 0,
+                                  child: IconButton(
+                                    icon: Icon(Icons.clear, size: 20),
+                                    onPressed: () {
+                                      setState(() {
+                                        selectedParty = null;
+                                        _resetFiltersAndCandidates();
+                                        _fetchCandidates();
+                                      });
+                                    },
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: displayedCandidates.isEmpty
+                          ? Center(child: Text("No candidates to show."))
+                          : NotificationListener<ScrollNotification>(
+                        onNotification: (ScrollNotification scrollInfo) {
+                          if (scrollInfo.metrics.pixels ==
+                              scrollInfo.metrics.maxScrollExtent &&
+                              displayedCandidates.length < allCandidates.length) {
+                            _loadMoreCandidates();
+                          }
+                          return false;
+                        },
+                        child: ListView.builder(
+                          itemCount: displayedCandidates.length + 1, // +1 for "Load More" button
+                          itemBuilder: (context, index) {
+                            if (index < displayedCandidates.length) {
+                              return _buildCandidateCard(displayedCandidates[index]);
+                            } else {
+                              // Show Load More Button only if more candidates exist
+                              return (displayedCandidates.length < allCandidates.length)
+                                  ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: TextButton(
+                                    onPressed: _loadMoreCandidates,
+                                    child: Text(
+                                      "Load More",
+                                      style: TextStyle(
+                                        color: Colors.blue,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                                  : SizedBox.shrink(); // If no more candidates, show nothing
+                            }
+                          },
+                        ),
+
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Parties Tab
+              parties.isEmpty
+                  ? Center(child: CircularProgressIndicator())
+                  : Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ListView.builder(
+                  itemCount: parties.length,
+                  itemBuilder: (context, index) => _buildPartyTile(parties[index]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<String> _getStatesByParty(String party) {
+    Set<String> result = {};
+    for (var candidate in allCandidates) {
+      if (candidate['party'] == party && candidate['state'] != null) {
+        result.add(candidate['state']);
+      }
+    }
+    return result.toList();
+  }
+
+  List<Map<String, dynamic>> _getPartiesByState(String state) {
+    Set<String> partyNames = {};
+    for (var candidate in allCandidates) {
+      if (candidate['state'] == state && candidate['party'] != null) {
+        partyNames.add(candidate['party']);
+      }
+    }
+    return parties.where((party) => partyNames.contains(party['name'])).toList();
+  }
+
+  // Reuse your original methods for candidate popup and UI rendering
+  Widget _buildCandidateCard(Map<String, dynamic> candidate) {
+    return GestureDetector(
+      onTap: () => _showCandidatePopup(candidate),
+      child: Card(
+        margin: EdgeInsets.symmetric(vertical: 6),
+        child: ListTile(
+          leading: CircleAvatar(
+            radius: 30,
+            backgroundImage: (candidate['imageUrl'] != null && candidate['imageUrl'].toString().isNotEmpty)
+                ? NetworkImage(candidate['imageUrl'])
+                : null,
+            child: (candidate['imageUrl'] == null || candidate['imageUrl'].toString().isEmpty)
+                ? Icon(Icons.person, size: 30)
+                : null,
+          ),
+          title: Text(candidate['name'], style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text("Party: ${candidate['party']}\nConstituency: ${candidate['constituency']}"),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPartyTile(Map<String, dynamic> party) {
+    return Card(
+      child: ListTile(
+        leading: party['logoUrl'] != null && party['logoUrl'].toString().isNotEmpty
+            ? CircleAvatar(backgroundImage: NetworkImage(party['logoUrl']))
+            : CircleAvatar(child: Icon(Icons.flag)),
+        title: Text(party['name']),
+        subtitle: Text("Leader: ${party['leader']}\nSymbol: ${party['symbol']}"),
+      ),
+    );
   }
 
   void _showCandidatePopup(Map<String, dynamic> candidate) {
@@ -206,145 +524,6 @@ class _CandidatesScreenState extends State<CandidatesScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildCandidateCard(Map<String, dynamic> candidate) {
-    return GestureDetector(
-      onTap: () => _showCandidatePopup(candidate),
-      child: Card(
-        elevation: 3,
-        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 35,
-                backgroundImage: (candidate['imageUrl'] != null && candidate['imageUrl'].toString().isNotEmpty)
-                    ? NetworkImage(candidate['imageUrl'])
-                    : null,
-                child: (candidate['imageUrl'] == null || candidate['imageUrl'].toString().isEmpty)
-                    ? Icon(Icons.person, size: 40)
-                    : null,
-              ),
-              SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(candidate['name'] ?? '',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 4),
-                    Text("Party: ${candidate['party']}"),
-                    Text("Constituency: ${candidate['constituency'] ?? 'N/A'}"),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+// Reuse your existing popup implementation here.
   }
 
-  Widget _buildPartyTile(Map<String, dynamic> party) {
-    return Card(
-      elevation: 2,
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        leading: party['logoUrl'] != null && party['logoUrl'].toString().isNotEmpty
-            ? CircleAvatar(
-          backgroundImage: NetworkImage(party['logoUrl']),
-          radius: 24,
-          onBackgroundImageError: (_, __) {},
-        )
-            : CircleAvatar(
-          child: Icon(Icons.flag),
-          radius: 24,
-        ),
-        title: Text(party['name'], style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 4),
-            Text("Leader: ${party['leader'] ?? 'N/A'}"),
-            Text("Symbol: ${party['symbol'] ?? 'N/A'}"),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          color: Colors.blue,
-          child: TabBar(
-            controller: _tabController,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            indicatorColor: Colors.white,
-            tabs: const [
-              Tab(text: "Candidates"),
-              Tab(text: "Parties"),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Candidates Tab
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: selectedElection,
-                      decoration: InputDecoration(labelText: "Select Election", border: OutlineInputBorder()),
-                      items: ["Lok Sabha", "Vidhan Sabha", "Rajya Sabha"]
-                          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                          .toList(),
-                      onChanged: (val) async {
-                        setState(() {
-                          selectedElection = val;
-                          candidates.clear();
-                        });
-
-                        if (val == "Lok Sabha") {
-                          await _fetchLokSabhaCandidates();
-                        }
-                      },
-                    ),
-                    SizedBox(height: 10),
-                    Expanded(
-                      child: candidates.isEmpty
-                          ? Center(child: Text("No candidates to show."))
-                          : ListView.builder(
-                        itemCount: candidates.length,
-                        itemBuilder: (context, index) =>
-                            _buildCandidateCard(candidates[index]),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Parties Tab
-              parties.isEmpty
-                  ? Center(child: CircularProgressIndicator())
-                  : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: ListView.builder(
-                  itemCount: parties.length,
-                  itemBuilder: (context, index) => _buildPartyTile(parties[index]),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
