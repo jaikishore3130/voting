@@ -42,9 +42,10 @@ dependencies:
   shared_preferences: ^2.2.0
   fluttertoast: ^8.2.4
   encrypt: ^5.0.3 # For storing login sessions
-
+  dropdown_search: ^5.0.6
   cupertino_icons: ^1.0.8
   twilio_flutter: ^0.0.9
+  cached_network_image: ^3.3.1
 
 dev_dependencies:
   flutter_test:
