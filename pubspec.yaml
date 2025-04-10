@@ -46,6 +46,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   twilio_flutter: ^0.0.9
   cached_network_image: ^3.3.1
+  fl_chart: ^0.63.0
 
 dev_dependencies:
   flutter_test:
