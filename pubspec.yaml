@@ -47,6 +47,7 @@ dependencies:
   twilio_flutter: ^0.0.9
   cached_network_image: ^3.3.1
   fl_chart: ^0.63.0
+  lottie: ^2.6.0
 
 dev_dependencies:
   flutter_test:
@@ -76,6 +77,8 @@ flutter:
     - assets/images/logo.jpg
     - assets/images/aalogo.png
     - assets/images/otplogo.jpg
+    - assets/animations/login_animation.json
+    - assets/animations/otp_animation.json
 
 
 

@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:async';
+import 'package:lottie/lottie.dart';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -123,12 +124,12 @@ class _VoterLoginState extends State<VoterLoginScreen> {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     final random = Random();
     generatedCaptcha = String.fromCharCodes(
-      List.generate(6,
-              (index) => chars.codeUnitAt(random.nextInt(chars.length))),
+      List.generate(6, (index) => chars.codeUnitAt(random.nextInt(chars.length))),
     );
     _captchaController.clear();
     setState(() {});
   }
+
 
   Future<Map<String, dynamic>?> _getVoterDetails(String aadhaar) async {
     try {
@@ -221,240 +222,333 @@ class _VoterLoginState extends State<VoterLoginScreen> {
   }
 
 
-@override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Voter login")),
-      body: Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: otpSent ? _buildOtpScreen() : _buildAadhaarScreen(),
+      appBar: AppBar(title: Text("Voter Login")),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: otpSent ? _buildOtpScreen(context) : _buildAadhaarScreen(context),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAadhaarScreen(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              offset: Offset(0, 0),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Lottie.asset(
+              'assets/animations/login_animation.json',
+              height: screenWidth * 0.5, // responsive
+            ),
+            const SizedBox(height: 30),
+
+            // Aadhaar Field
+            buildStyledTextField(
+              "Aadhaar Number",
+              _aadhaarController,
+              maxLength: 12,
+              keyboardType: TextInputType.number,
+              icon: Icons.credit_card,
+            ),
+            const SizedBox(height: 20),
+
+            // CAPTCHA Section
+            Row(
+              children: [
+                // CAPTCHA Input (60%)
+                Expanded(
+                  flex: 6,
+                  child: buildStyledTextField(
+                    "CAPTCHA",
+                    _captchaController,
+                    icon: Icons.security,
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // CAPTCHA Display (30%)
+                // CAPTCHA Display (30%)
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    height: 50,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,// White background
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.black26, width: 0.5), // Border color and width
+                    ),
+                    child: CustomPaint(
+                      painter: CaptchaPainter(generatedCaptcha),
+                      child: Container(),
+                    ),
+                  ),
+                ),
+
+
+                // Refresh Button (10%)
+                Expanded(
+                  flex: 1,
+                  child: IconButton(
+                    onPressed: _generateCaptcha,
+                    icon: const Icon(Icons.refresh, color: Colors.blue),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 25),
+
+            // Verify Button
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: verifyInputs,
+                icon: const Icon(Icons.verified, color: Colors.white),
+                label: const Text("Verify"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[400],
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  elevation: 6,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildAadhaarScreen() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Logo at the top
-        Image.asset("assets/images/aalogo.png", height: 100),
-        SizedBox(height: 20),
-
-        // Aadhaar Number Input
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            "Enter Aadhaar Number",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+  Widget buildStyledTextField(
+      String hint,
+      TextEditingController controller, {
+        bool obscureText = false,
+        int? maxLength,
+        TextInputType? keyboardType,
+        IconData? icon,
+      }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      maxLength: maxLength,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.black),
+      decoration: InputDecoration(
+        prefixIcon: icon != null ? Icon(icon, color: Colors.blueGrey) : null,
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.8),
+        hintText: hint,
+        counterText: '',
+        hintStyle: const TextStyle(color: Colors.black54),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide.none,
         ),
-        SizedBox(height: 5),
-        TextField(
-          controller: _aadhaarController,
-          keyboardType: TextInputType.number,
-          maxLength: 12,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(),
-            labelText: "Aadhaar Number",
-          ),
-        ),
-        SizedBox(height: 20),
-
-        // CAPTCHA Section
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            "Enter CAPTCHA",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ),
-        SizedBox(height: 5),
-
-        Row(
-          children: [
-            // CAPTCHA Input Field
-            Expanded(
-              flex: 2,
-              child: TextField(
-                controller: _captchaController,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: "Enter CAPTCHA",
-                ),
-              ),
-            ),
-            SizedBox(width: 10),
-
-            // CAPTCHA Image
-            Container(
-              padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                generatedCaptcha,
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            SizedBox(width: 10),
-
-            // Refresh CAPTCHA Button
-            IconButton(
-              icon: Icon(Icons.refresh, color: Colors.blue),
-              onPressed: _generateCaptcha,
-            ),
-          ],
-        ),
-
-        SizedBox(height: 20),
-
-        // Verify Button
-        ElevatedButton.icon(
-          onPressed: verifyInputs,
-          icon: Icon(Icons.verified, color: Colors.white),
-          label: Text("Verify"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-        ),
-      ],
+      ),
     );
   }
+  Widget _buildOtpScreen(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
 
-
-  // OTP Screen UI
-  Widget _buildOtpScreen() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Logo
-        Image.asset("assets/images/otplogo.jpg", height: 200),
-        SizedBox(height: 20),
-
-        // OTP sent text
-        Text(
-          "OTP sent to",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.black54),
-        ),
-        Text(
-          maskedPhoneNumber ?? "+91 XXXXX X1234",
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
-        ),
-        SizedBox(height: 20),
-        // OTP input boxes with backspace handling
-        RawKeyboardListener(
-          focusNode: FocusNode(), // Required for capturing key events
-          onKey: (event) {
-            if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
-              for (int i = 0; i <= 5; i++) {
-                if (_otpControllers[i].text.isEmpty && _otpControllers[i-1].text.isNotEmpty) {
-                  _otpControllers[i - 1].clear();
-                  FocusScope.of(context).requestFocus(_otpFocusNodes[i - 1]);
-                  break;
-                }
-              }
-            }
-          },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(6, (index) {
-              return Container(
-                width: 45,
-                height: 55,
-                margin: EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.purple,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _otpFocusNodes[index].hasFocus ? Colors.blue:Colors.black,
-                      blurRadius: 5,
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  controller: _otpControllers[index],
-                  focusNode: _otpFocusNodes[index],
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 1,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    counterText: "",
-                    border: InputBorder.none,
-                  ),
-                  onChanged: (value) {
-                    if (value.isNotEmpty && index < 5) {
-                      FocusScope.of(context).requestFocus(_otpFocusNodes[index + 1]);
-                    } else if (value.isEmpty && index > 0) {
-                      FocusScope.of(context).requestFocus(_otpFocusNodes[index - 1]);
-                    }
-                  },
-                ),
-              );
-            }),
-          ),
-        ),
-
-
-        // OTP input boxes
-
-        SizedBox(height: 30),
-
-        // Verify OTP Button
-        ElevatedButton.icon(
-          onPressed: verifyOTP,
-          icon: Icon(Icons.verified, color: Colors.white),
-          label: Text("Verify OTP", style: TextStyle(fontSize: 18)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            elevation: 5,
-          ),
-        ),
-        SizedBox(height: 10),
-
-        Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.06, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(height: 5),
+            // Lottie Animation (Responsive)
+            SizedBox(
+              height: screenHeight * 0.3,
+              child: Lottie.asset('assets/animations/otp_animation.json', fit: BoxFit.contain),
+            ),
 
-            TextButton(
-              onPressed: _canResend ? () {
-                resendOTP(); // Send a new OTP
-                startResendTimer(); // Start countdown timer
-              } : null, // Disable button during countdown
-              child: AnimatedBuilder(
-                animation: _resendTimeoutNotifier,
-                builder: (context, child) {
-                  int minutes = _resendTimeoutNotifier.value ~/ 60;
-                  int seconds = _resendTimeoutNotifier.value % 60;
-                  String formattedTime = "$minutes:${seconds.toString().padLeft(2, '0')}"; // Format as MM:SS
+            SizedBox(height: 20),
 
-                  return Text(
-                    _canResend ? "Resend OTP" : "Resend OTP In $formattedTime",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: _canResend ? Colors.blue : Colors.grey, // Grey when disabled
-                      decoration: _canResend ? TextDecoration.underline : null,
+            // OTP Info Texts
+            Text(
+              "OTP sent to",
+              style: TextStyle(fontSize: 18, color: Colors.black54),
+            ),
+            Text(
+              maskedPhoneNumber ?? "+91 XXXXX X1234",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
+            ),
+
+            SizedBox(height: 25),
+
+            // OTP Fields
+            RawKeyboardListener(
+              focusNode: FocusNode(),
+              onKey: (event) {
+                if (event is RawKeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.backspace) {
+                  for (int i = 0; i <= 5; i++) {
+                    if (_otpControllers[i].text.isEmpty && i > 0) {
+                      _otpControllers[i - 1].clear();
+                      FocusScope.of(context).requestFocus(_otpFocusNodes[i - 1]);
+                      break;
+                    }
+                  }
+                }
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(6, (index) {
+                  return SizedBox(
+                    width: screenWidth * 0.1,
+                    height: screenHeight * 0.065,
+                    child: TextField(
+                      controller: _otpControllers[index],
+                      focusNode: _otpFocusNodes[index],
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      maxLength: 1,
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      decoration: InputDecoration(
+                        counterText: "",
+                        filled: true,
+                        fillColor: Colors.purple[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        if (value.isNotEmpty && index < 5) {
+                          FocusScope.of(context).requestFocus(_otpFocusNodes[index + 1]);
+                        } else if (value.isEmpty && index > 0) {
+                          FocusScope.of(context).requestFocus(_otpFocusNodes[index - 1]);
+                        }
+                      },
                     ),
                   );
-                },
+                }),
               ),
             ),
 
+            SizedBox(height: 30),
+
+            // Verify OTP Button
+            ElevatedButton.icon(
+              onPressed: verifyOTP,
+              icon: Icon(Icons.verified, color: Colors.white),
+              label: Text("Verify OTP", style: TextStyle(fontSize: 18)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 5,
+              ),
+            ),
+
+            SizedBox(height: 15),
+
+            // Resend OTP
+            ValueListenableBuilder<int>(
+              valueListenable: _resendTimeoutNotifier,
+              builder: (context, value, _) {
+                int minutes = value ~/ 60;
+                int seconds = value % 60;
+                return TextButton(
+                  onPressed: _canResend ? () {
+                    resendOTP();
+                    startResendTimer();
+                  } : null,
+                  child: Text(
+                    _canResend
+                        ? "Resend OTP"
+                        : "Resend OTP in $minutes:${seconds.toString().padLeft(2, '0')}",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: _canResend ? Colors.blue : Colors.grey,
+                      decoration: _canResend ? TextDecoration.underline : null,
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         ),
-
-      ],
+      ),
     );
   }
 
 }
+class CaptchaPainter extends CustomPainter {
+  final String captcha;
 
+  CaptchaPainter(this.captcha);
 
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = Random();
+    final paint = Paint()..color = Colors.white;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
+
+    final textStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 24,
+      fontWeight: FontWeight.bold,
+    );
+
+    final textPainter = TextPainter(
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    );
+
+    for (int i = 0; i < captcha.length; i++) {
+      textPainter.text = TextSpan(
+        text: captcha[i],
+        style: textStyle.copyWith(
+          fontSize: 24 + random.nextInt(4).toDouble(),
+          color: Colors.primaries[random.nextInt(Colors.primaries.length)],
+        ),
+      );
+
+      textPainter.layout();
+      final x = i * size.width / captcha.length + random.nextDouble() * 2;
+      final y = random.nextDouble() * 10;
+      textPainter.paint(canvas, Offset(x, y));
+    }
+
+    // Optional: Add some noise lines
+    for (int i = 0; i < 5; i++) {
+      final linePaint = Paint()
+        ..color = Colors.black.withOpacity(0.2)
+        ..strokeWidth = 1;
+      canvas.drawLine(
+        Offset(random.nextDouble() * size.width, random.nextDouble() * size.height),
+        Offset(random.nextDouble() * size.width, random.nextDouble() * size.height),
+        linePaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
