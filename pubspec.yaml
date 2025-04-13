@@ -79,6 +79,8 @@ flutter:
     - assets/images/otplogo.jpg
     - assets/animations/login_animation.json
     - assets/animations/otp_animation.json
+    - assets/animations/lock.json
+    - assets/animations/forgot.json
 
 
 

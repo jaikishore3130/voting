@@ -69,28 +69,37 @@ class _ElectionResultDialogState extends State<ElectionResultDialog> {
     final partyDocs = await electionRef.get();
 
     for (var partyDoc in partyDocs.docs) {
-      final candidatesSnap = await electionRef
-          .doc(partyDoc.id)
-          .collection('candidates')
-          .where('winner', isEqualTo: true)
-          .get();
+      try {
+        final candidatesSnap = await electionRef
+            .doc(partyDoc.id)
+            .collection('candidates')
+            .where('winner', isEqualTo: true)
+            .get();
 
-      for (var doc in candidatesSnap.docs) {
-        final data = doc.data();
-        winnerList.add(data);
+        if (candidatesSnap.docs.isEmpty) continue; // Skip if no winners
 
-        final party = data['party'] ?? partyDoc.id;
-        final symbol = data['symbol'];
+        for (var doc in candidatesSnap.docs) {
+          final data = doc.data();
+          winnerList.add(data);
 
-        countMap[party] = (countMap[party] ?? 0) + 1;
+          final party = data['party'] ?? partyDoc.id;
+          final symbol = data['symbol'];
 
-        if (countMap[party]! > maxCount) {
-          maxCount = countMap[party]!;
-          topParty = party;
-          topSymbol = symbol;
+          countMap[party] = (countMap[party] ?? 0) + 1;
+
+          if (countMap[party]! > maxCount) {
+            maxCount = countMap[party]!;
+            topParty = party;
+            topSymbol = symbol;
+          }
         }
+      } catch (e) {
+        print('Subcollection missing for ${partyDoc.id}: $e');
+        // Skip this partyDoc silently if candidates collection doesn't exist
+        continue;
       }
     }
+
 
     setState(() {
       partyWinCount = countMap;
@@ -103,6 +112,9 @@ class _ElectionResultDialogState extends State<ElectionResultDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Dialog(
       insetPadding: EdgeInsets.all(16),
       backgroundColor: Colors.white,
@@ -113,7 +125,8 @@ class _ElectionResultDialogState extends State<ElectionResultDialog> {
         child: Center(child: CircularProgressIndicator()),
       )
           : Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+        constraints: BoxConstraints(
+            maxHeight: screenHeight * 0.85, maxWidth: screenWidth * 0.95),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -131,10 +144,11 @@ class _ElectionResultDialogState extends State<ElectionResultDialog> {
                       borderRadius: BorderRadius.circular(30),
                       child: Image.network(
                         winningSymbol!,
-                        height: 50,
-                        width: 50,
+                        height: screenHeight * 0.06,
+                        width: screenHeight * 0.06,
+                        fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) =>
-                            Icon(Icons.flag, size: 40),
+                            Icon(Icons.flag, size: screenHeight * 0.05),
                       ),
                     ),
                   SizedBox(width: 12),
@@ -142,24 +156,20 @@ class _ElectionResultDialogState extends State<ElectionResultDialog> {
                     child: Text(
                       "🏆 $winningParty",
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: screenWidth * 0.05,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  Positioned(
-                    right: 10,
-                    top: 10,
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Colors.grey.shade300,
-                        child: Icon(
-                          Icons.close,
-                          color:Colors.black54,
-                          size: 18,
-                        ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.grey.shade300,
+                      child: Icon(
+                        Icons.close,
+                        color: Colors.black54,
+                        size: 18,
                       ),
                     ),
                   ),
@@ -169,16 +179,29 @@ class _ElectionResultDialogState extends State<ElectionResultDialog> {
 
             // Scrollable content
             Expanded(
-              child: SingleChildScrollView(
+              child: winners.isEmpty
+                  ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Text(
+                    "No data available for ${widget.electionType}.",
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+                  : SingleChildScrollView(
                 padding: EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Seats Won by Parties", style: TextStyle(fontSize: 16)),
+                    Text("Seats Won by Parties",
+                        style: TextStyle(fontSize: screenWidth * 0.045)),
                     SizedBox(height: 16),
                     PartySeatPieChart(data: partyWinCount),
                     SizedBox(height: 16),
-                    Text("Winning Candidates", style: TextStyle(fontSize: 16)),
+                    Text("Winning Candidates",
+                        style: TextStyle(fontSize: screenWidth * 0.045)),
                     SizedBox(height: 8),
                     ListView.builder(
                       shrinkWrap: true,
@@ -187,16 +210,22 @@ class _ElectionResultDialogState extends State<ElectionResultDialog> {
                       itemBuilder: (_, i) {
                         final c = winners[i];
                         return ListTile(
-                          leading: Icon(Icons.person),
-                          title: Text(c['name'] ?? 'Unknown'),
-                          subtitle: Text('${c['party']} - ${c['constituency']}'),
+                          leading:
+                          Icon(Icons.person, size: screenWidth * 0.06),
+                          title: Text(c['name'] ?? 'Unknown',
+                              style: TextStyle(fontSize: screenWidth * 0.04)),
+                          subtitle: Text(
+                              '${c['party']} - ${c['constituency']}',
+                              style:
+                              TextStyle(fontSize: screenWidth * 0.035)),
                         );
                       },
                     ),
                   ],
                 ),
               ),
-            ),
+            )
+
           ],
         ),
       ),
@@ -228,13 +257,17 @@ class PartySeatPieChart extends StatelessWidget {
       Colors.green,
       Colors.orange,
       Colors.purple,
-      Colors.grey, // for "Others"
+      Colors.grey,
     ];
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
 
     return Column(
       children: [
-        AspectRatio(
-          aspectRatio: 1.5,
+        // Pie Chart with fixed height using MediaQuery
+        SizedBox(
+          height: screenHeight * 0.3, // 30% of screen height
           child: PieChart(
             PieChartData(
               sectionsSpace: 2,
@@ -246,9 +279,9 @@ class PartySeatPieChart extends StatelessWidget {
                   value: entry.value.toDouble(),
                   title: '${percentage.toStringAsFixed(1)}%',
                   color: colors[index % colors.length],
-                  radius: 80,
-                  titleStyle: const TextStyle(
-                    fontSize: 12,
+                  radius: screenWidth * 0.1,
+                  titleStyle: TextStyle(
+                    fontSize: screenWidth * 0.03,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -260,10 +293,12 @@ class PartySeatPieChart extends StatelessWidget {
             swapAnimationCurve: Curves.easeInOutCubic,
           ),
         ),
-        SizedBox(height: 12),
+        SizedBox(height: 16),
+        // Legend
         Wrap(
           spacing: 12,
           runSpacing: 6,
+          alignment: WrapAlignment.center,
           children: displayEntries.mapIndexed((index, entry) {
             return Row(
               mainAxisSize: MainAxisSize.min,
@@ -279,10 +314,12 @@ class PartySeatPieChart extends StatelessWidget {
             );
           }).toList(),
         ),
+        SizedBox(height: 20), // Extra space to separate from next section
       ],
     );
   }
 }
+
 
 extension MapIndexedExtension<K, V> on Iterable<MapEntry<K, V>> {
   Iterable<T> mapIndexed<T>(T Function(int index, MapEntry<K, V> e) f) {
