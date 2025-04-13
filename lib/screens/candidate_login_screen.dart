@@ -210,10 +210,11 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
                     flex: 4,
                     child: Container(
                       height: 50,
+                      padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.black12, width: 1),
+                        border: Border.all(color: Colors.black12, width: 0.5),
                       ),
                       child: CustomPaint(
                         painter: CaptchaPainter(generatedCaptcha),
@@ -431,7 +432,7 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
     }
 
     // Call OTP sending function again
-    validateInputs();
+    resendOtp();
   }
 
   Widget buildTextField(String label, TextEditingController controller,
@@ -483,6 +484,7 @@ class CaptchaPainter extends CustomPainter {
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     );
+    List<String> fontFamilies = ['Roboto', 'Courier', 'Times New Roman', 'Arial', 'Georgia'];
 
     for (int i = 0; i < captcha.length; i++) {
       textPainter.text = TextSpan(
@@ -490,9 +492,11 @@ class CaptchaPainter extends CustomPainter {
         style: textStyle.copyWith(
           fontSize: 24 + random.nextInt(4).toDouble(),
           color: Colors.primaries[random.nextInt(Colors.primaries.length)],
+          fontFamily: fontFamilies[random.nextInt(fontFamilies.length)], // Random font
+          fontWeight: FontWeight.values[random.nextInt(FontWeight.values.length)], // Random weight
+          fontStyle: random.nextBool() ? FontStyle.italic : FontStyle.normal, // Random style
         ),
       );
-
       textPainter.layout();
       final x = i * size.width / captcha.length + random.nextDouble() * 2;
       final y = random.nextDouble() * 10;
@@ -500,7 +504,7 @@ class CaptchaPainter extends CustomPainter {
     }
 
     // Optional: Add some noise lines
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 7; i++) {
       final linePaint = Paint()
         ..color = Colors.black.withOpacity(0.2)
         ..strokeWidth = 1;
