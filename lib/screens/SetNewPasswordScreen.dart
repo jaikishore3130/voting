@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:voting/screens/candidate_login_screen.dart';
+import 'package:voting/screens/ec_login_screen.dart';
 
 class SetNewPasswordScreen extends StatefulWidget {
   final String aadhaarNumber;
@@ -25,7 +26,6 @@ class _SetNewPasswordScreenState extends State<SetNewPasswordScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   late AnimationController _animationController;
-  late Animation<double> _animation;
 
   bool _isLoading = false;
   String _generatedCaptcha = '';
@@ -38,7 +38,6 @@ class _SetNewPasswordScreenState extends State<SetNewPasswordScreen>
       vsync: this,
       duration: Duration(seconds: 1),
     );
-    _animation = Tween<double>(begin: 1.0, end: 1.1).animate(_animationController);
     _animationController.repeat(reverse: true);
   }
 
@@ -93,18 +92,18 @@ class _SetNewPasswordScreenState extends State<SetNewPasswordScreen>
           if (candidateDoc.exists) {
             await candidateDoc.reference.update({'password': newPassword});
             _showSnackBar("Password updated successfully!");
-            _navigateToLogin();
+            _navigateToLogin(widget.userType);
             return;
           }
         }
         _showSnackBar("Candidate not found.");
-      } else if (widget.userType == "ec_employee") {
+      } else if (widget.userType == "ec_employees") {
         final docRef = _firestore.collection('EC_EMPLOYEES').doc(widget.aadhaarNumber);
         final doc = await docRef.get();
         if (doc.exists) {
           await docRef.update({'password': newPassword});
           _showSnackBar("Password updated successfully!");
-          _navigateToLogin();
+          _navigateToLogin(widget.userType);
         } else {
           _showSnackBar("EC Employee not found.");
         }
@@ -120,13 +119,22 @@ class _SetNewPasswordScreenState extends State<SetNewPasswordScreen>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  void _navigateToLogin() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => CandidateLoginScreen()),
-          (route) => false,
-    );
+  void _navigateToLogin(String userType) {
+    if (widget.userType == 'candidate') {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => CandidateLoginScreen()),
+            (route) => false,
+      );
+    } else if (widget.userType == 'ec_employees') {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => ECLoginScreen()), // Replace with your actual EC login screen
+            (route) => false,
+      );
+    }
   }
+
 
   @override
   void dispose() {

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:encrypt/encrypt.dart' as encrypt;
-
+import 'package:voting/screens/nomination_screen.dart';
 class HomeScreen extends StatefulWidget {
   final String aadhaarNumber;
 
@@ -22,13 +22,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final PageController _pageController = PageController(viewportFraction: 0.9);
   int _currentPage = 0;
   Timer? _timer;
+  bool _isNominationEnabled = false;
+
 
   @override
   void initState() {
     super.initState();
     _fetchUserProfile();
     _fetchNews();
+    _fetchNominationStatus(); // 🆕 fetch nomination flag
   }
+
 
   @override
   void dispose() {
@@ -45,6 +49,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (doc.exists) {
       setState(() {
         _profileData = doc.data();
+      });
+    }
+  }
+  Future<void> _fetchNominationStatus() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('app_settings')
+        .doc('general')
+        .get();
+    if (doc.exists) {
+      setState(() {
+        _isNominationEnabled = doc['nomination_enabled'] == true;
       });
     }
   }
@@ -226,6 +241,22 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          if (_isNominationEnabled)
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => NominationScreen(aadhaarNumber: widget.aadhaarNumber,)),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: Icon(Icons.how_to_vote),
+              label: Text("Submit Nomination"),
+            ),
 
           SizedBox(height: 20),
           Text(

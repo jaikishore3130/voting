@@ -8,6 +8,7 @@ import 'package:voting/screens/SetNewPasswordScreen.dart';
 import 'package:voting/screens/voter/voter_dashboard.dart';
 import 'candidate_dashboard.dart';
 import 'ec_dashboard.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -23,7 +24,24 @@ class OtpScreen extends StatefulWidget {
   @override
   _OtpScreenState createState() => _OtpScreenState();
 }
+Future<Map<String, dynamic>?> fetchECData(String aadhaar) async {
+  try {
+    final doc = await FirebaseFirestore.instance
+        .collection('EC_EMPLOYEES')
+        .doc(aadhaar)
+        .get();
 
+
+    if (doc.exists) {
+      return doc.data();
+    } else {
+      print("No record found for this Aadhaar!");
+    }
+  } catch (e) {
+    print("Firestore Error: $e");
+  }
+  return null;
+}
 class _OtpScreenState extends State<OtpScreen> {
   List<TextEditingController> _otpControllers =
   List.generate(6, (_) => TextEditingController());
@@ -39,9 +57,10 @@ class _OtpScreenState extends State<OtpScreen> {
   void initState() {
     super.initState();
     twilioFlutter = TwilioFlutter(
-      accountSid: 'ACe7434c012ed32996526101fdc5e2f1ff',
-      authToken: '338343628ebc83d5617e65284990900c',
-      twilioNumber: '+15178588142',
+      accountSid: 'ACf0dd706f7c2cdc8d6e360de8eb887a95',
+      authToken: 'b134bda1ddc95d59cc5906b86d3b5d35',
+      twilioNumber: '+12189554622',
+
     );
     _generateNewOtp();
     _sendOtp();
@@ -95,7 +114,7 @@ class _OtpScreenState extends State<OtpScreen> {
     }
   }
 
-  void _navigateToDashboard() {
+  Future<void> _navigateToDashboard() async {
     if (widget.userType == "voter") {
       Navigator.pushReplacement(
         context,
@@ -125,10 +144,11 @@ class _OtpScreenState extends State<OtpScreen> {
         ),
       );
     } else if (widget.userType == "ec_employee") {
+      final data = await fetchECData(widget.aadhaarNumber);
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => EcEmployeeDashboard(aadhaarNumber: widget.aadhaarNumber),
+          builder: (_) => EcEmployeeDashboard(aadhaarNumber: widget.aadhaarNumber, role: '${data?['role']}', state: '${data?['state']}',),
         ),
       );
     } else {

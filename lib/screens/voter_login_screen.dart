@@ -23,7 +23,6 @@ class _VoterLoginState extends State<VoterLoginScreen> {
   String generatedCaptcha = "";
 
 
-
   @override
   void initState() {
     super.initState();
@@ -31,11 +30,7 @@ class _VoterLoginState extends State<VoterLoginScreen> {
   }
 
 
-
 // Resend OTP function
-
-
-
 
 
   void _showMessage(String message) {
@@ -47,7 +42,8 @@ class _VoterLoginState extends State<VoterLoginScreen> {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     final random = Random();
     generatedCaptcha = String.fromCharCodes(
-      List.generate(6, (index) => chars.codeUnitAt(random.nextInt(chars.length))),
+      List.generate(
+          6, (index) => chars.codeUnitAt(random.nextInt(chars.length))),
     );
     _captchaController.clear();
     setState(() {});
@@ -113,21 +109,18 @@ class _VoterLoginState extends State<VoterLoginScreen> {
         }
 
 
-
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OtpScreen(
-                phoneNumber: phoneNumber,
-                aadhaarNumber: _aadhaarController.text,  // Pass the Aadhaar number
-                userType: 'voter',  // Adjust this based on the user type (voter, candidate, ec_employee)
-              ),
-            ),
-          );
-
-
-
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                OtpScreen(
+                  phoneNumber: phoneNumber,
+                  aadhaarNumber: _aadhaarController.text,
+                  // Pass the Aadhaar number
+                  userType: 'voter', // Adjust this based on the user type (voter, candidate, ec_employee)
+                ),
+          ),
+        );
       } else {
         _showMessage("Invalid Aadhaar details! Contact EC.");
       }
@@ -139,131 +132,108 @@ class _VoterLoginState extends State<VoterLoginScreen> {
   }
 
 
-
-
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery
+        .of(context)
+        .size
+        .height;
+    final screenWidth = MediaQuery
+        .of(context)
+        .size
+        .width;
+
     return Scaffold(
-      appBar: AppBar(title: Text("Voter Login")),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: _buildAadhaarScreen(context),
-            ),
-          );
-        },
-      ),
+      backgroundColor:  Color(0xFF11395E),
+      appBar: AppBar(
+        title: const Text(
+          "Voter Login",
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Color(0xFF072743),
+        centerTitle: true,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white), // <- This makes the back arrow white
+
+    ),
+      body: buildLoginForm(screenHeight, screenWidth),
     );
   }
 
-  Widget _buildAadhaarScreen(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
+  Widget buildLoginForm(double screenHeight, double screenWidth) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 10,
-              offset: Offset(0, 0),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Lottie.asset(
-              'assets/animations/login_animation.json',
-              height: screenWidth * 0.5, // responsive
-            ),
-            const SizedBox(height: 30),
 
-            // Aadhaar Field
-            buildStyledTextField(
-              "Aadhaar Number",
-              _aadhaarController,
-              maxLength: 12,
-              keyboardType: TextInputType.number,
-              icon: Icons.credit_card,
-            ),
-            const SizedBox(height: 20),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+            horizontal: screenWidth * 0.08, vertical: 20),
 
-            // CAPTCHA Section
-            Row(
-              children: [
-                // CAPTCHA Input (60%)
-                Expanded(
-                  flex: 6,
-                  child: buildStyledTextField(
-                    "CAPTCHA",
-                    _captchaController,
-                    icon: Icons.security,
-                  ),
-                ),
-                const SizedBox(width: 10),
+        child: Container(
 
-                // CAPTCHA Display (30%)
-                // CAPTCHA Display (30%)
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    height: 50,
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,// White background
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.black26, width: 0.5), // Border color and width
-                    ),
-                    child: CustomPaint(
-                      painter: CaptchaPainter(generatedCaptcha),
-                      child: Container(),
-                    ),
-                  ),
-                ),
+          padding: const EdgeInsets.all(24),
 
+          decoration: BoxDecoration(
+            color:Color(0xFF79C5DD) ,
+            borderRadius: BorderRadius.circular(25),
 
-                // Refresh Button (10%)
-                Expanded(
-                  flex: 1,
-                  child: IconButton(
-                    onPressed: _generateCaptcha,
-                    icon: const Icon(Icons.refresh, color: Colors.blue),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 25),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
 
-            // Verify Button
-            Center(
-              child: ElevatedButton.icon(
+          child: Column(
+
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [const SizedBox(height: 20),
+              Lottie.asset(
+                'assets/animations/login_animation.json',
+                height: screenHeight * 0.28,
+              ),
+              const SizedBox(height: 20),
+
+              // Aadhaar Number Field
+              buildStyledTextField(
+                "Aadhaar Number",
+                _aadhaarController,
+                maxLength: 12,
+                keyboardType: TextInputType.number,
+                icon: Icons.credit_card,
+              ),
+              const SizedBox(height: 12),
+
+              // CAPTCHA Row
+              buildCaptchaRow(),
+
+              const SizedBox(height: 24),
+
+              // Verify Button
+              ElevatedButton.icon(
                 onPressed: verifyInputs,
                 icon: const Icon(Icons.verified, color: Colors.white),
-                label: const Text("Verify"),
+                label: const Text(
+                    "Verify", style: TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[400],
-                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  backgroundColor:Color(0xFF072743) ,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 40, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
                   elevation: 6,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget buildStyledTextField(
-      String hint,
+  Widget buildStyledTextField(String hint,
       TextEditingController controller, {
         bool obscureText = false,
         int? maxLength,
@@ -275,19 +245,65 @@ class _VoterLoginState extends State<VoterLoginScreen> {
       obscureText: obscureText,
       maxLength: maxLength,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.black),
+      style: const TextStyle(color: Colors.black87),
       decoration: InputDecoration(
-        prefixIcon: icon != null ? Icon(icon, color: Colors.blueGrey) : null,
+        prefixIcon: icon != null
+            ? Icon(icon, color: Colors.indigo.shade400)
+            : null,
         filled: true,
-        fillColor: Colors.white.withOpacity(0.8),
+        fillColor: Colors.white.withOpacity(0.9),
         hintText: hint,
         counterText: '',
-        hintStyle: const TextStyle(color: Colors.black54),
+        hintStyle: const TextStyle(color: Colors.black45),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(20),
           borderSide: BorderSide.none,
         ),
       ),
+    );
+  }
+
+  Widget buildCaptchaRow() {
+    return Row(
+      children: [
+        // CAPTCHA Input
+        Expanded(
+          flex: 6,
+          child: buildStyledTextField(
+            "CAPTCHA",
+            _captchaController,
+            icon: Icons.security,
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // CAPTCHA Display
+        Expanded(
+          flex: 4,
+          child: Container(
+            height: 50,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.black12, width: 0.6),
+            ),
+            child: CustomPaint(
+              painter: CaptchaPainter(generatedCaptcha),
+              child: Container(),
+            ),
+          ),
+        ),
+
+        // Refresh Icon
+        Expanded(
+          flex: 1,
+          child: IconButton(
+            onPressed: _generateCaptcha,
+            icon: const Icon(Icons.refresh, color: Colors.blue),
+          ),
+        ),
+      ],
     );
   }
 }

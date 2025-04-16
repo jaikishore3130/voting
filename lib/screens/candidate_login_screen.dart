@@ -159,8 +159,11 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Candidate Login"),
+        backgroundColor: Colors.purple.shade200,
+        centerTitle: true,
       ),
       body: buildLoginForm(screenHeight, screenWidth),
+      backgroundColor: Colors.purple,
     );
   }
 
@@ -181,7 +184,7 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.purple.shade100,
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: Colors.white.withOpacity(0.2)),
             boxShadow: [
@@ -215,9 +218,9 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
                 icon: const Icon(Icons.verified, color: Colors.white),
                 label: isLoading
                     ? const CircularProgressIndicator()
-                    : const Text("Verify"),
+                    : const Text("Verify",style: const TextStyle(color: Colors.white),),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[600],
+                  backgroundColor: Colors.purple.shade600,
                   padding: const EdgeInsets.symmetric(
                       horizontal: 40, vertical: 16),
                   shape: RoundedRectangleBorder(
