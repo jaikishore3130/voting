@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:voting/screens/candidate/home_tab.dart';
+import 'package:voting/screens/candidate/campaign_tab.dart';
+import 'package:voting/screens/candidate/election_info_tab.dart';
+import 'package:voting/screens/candidate/nomination_tab.dart';
+import 'package:voting/screens/candidate/feedback_tab.dart';
+
 class CandidateDashboard extends StatefulWidget {
   final String aadhaarNumber;
 
@@ -11,9 +17,12 @@ class CandidateDashboard extends StatefulWidget {
 }
 
 class _CandidateDashboardState extends State<CandidateDashboard> {
+  int _currentIndex = 0;
   String candidateName = '';
   String partyName = '';
   bool isLoading = true;
+
+  final List<Widget> _tabs = [];
 
   @override
   void initState() {
@@ -23,7 +32,6 @@ class _CandidateDashboardState extends State<CandidateDashboard> {
 
   Future<void> fetchCandidateDetails() async {
     try {
-      // Assuming Firestore collection: "candidates", field: "aadhaar"
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collectionGroup('candidates')
           .where('aadhaar', isEqualTo: widget.aadhaarNumber)
@@ -32,24 +40,26 @@ class _CandidateDashboardState extends State<CandidateDashboard> {
 
       if (snapshot.docs.isNotEmpty) {
         final data = snapshot.docs.first.data() as Map<String, dynamic>;
-        setState(() {
-          candidateName = data['name'] ?? 'Candidate';
-          partyName = data['party'] ?? 'Unknown Party';
-          isLoading = false;
-        });
+        candidateName = data['name'] ?? 'Candidate';
+        partyName = data['party'] ?? 'Unknown Party';
       } else {
-        setState(() {
-          candidateName = 'Candidate';
-          partyName = 'Unknown';
-          isLoading = false;
-        });
+        candidateName = 'Candidate';
+        partyName = 'Unknown';
       }
     } catch (e) {
       print('Error fetching candidate: $e');
+      candidateName = 'Candidate';
+      partyName = 'Unknown';
+    } finally {
       setState(() {
-        candidateName = 'Candidate';
-        partyName = 'Unknown';
         isLoading = false;
+        _tabs.addAll([
+          HomeScreen( aadhaarNumber: widget.aadhaarNumber,),
+          CampaignTab(),
+          ElectionInfoTab(),
+          NominationTab(),
+          FeedbackTab(),
+        ]);
       });
     }
   }
@@ -58,76 +68,22 @@ class _CandidateDashboardState extends State<CandidateDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: isLoading
-            ? Text("Loading...")
-            : Text("Welcome, $candidateName"),
+        title: Text(isLoading ? "Loading..." : "Welcome, $candidateName"),
         backgroundColor: Colors.deepPurple,
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : ListView(
-        padding: EdgeInsets.all(16),
-        children: [
-          Text(
-            "$candidateName ($partyName)",
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 20),
-          _buildCard(
-            title: "Your Profile",
-            icon: Icons.person,
-            content: "View and update your personal and party details.",
-            onTap: () {},
-          ),
-          _buildCard(
-            title: "Campaign Manager",
-            icon: Icons.campaign,
-            content: "Manage campaign strategies and announcements.",
-            onTap: () {},
-          ),
-          _buildCard(
-            title: "Election Info",
-            icon: Icons.how_to_vote,
-            content: "Check ongoing and upcoming elections.",
-            onTap: () {},
-          ),
-          _buildCard(
-            title: "Track Nominations",
-            icon: Icons.check_circle_outline,
-            content: "View nomination status and updates.",
-            onTap: () {},
-          ),
-          _buildCard(
-            title: "Voter Feedback",
-            icon: Icons.feedback_outlined,
-            content: "View suggestions or complaints from voters.",
-            onTap: () {},
-          ),
+      body: isLoading ? Center(child: CircularProgressIndicator()) : _tabs[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: Colors.deepPurple,
+        unselectedItemColor: Colors.grey,
+        onTap: (index) => setState(() => _currentIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Campaign'),
+          BottomNavigationBarItem(icon: Icon(Icons.how_to_vote), label: 'Elections'),
+          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: 'Nominations'),
+          BottomNavigationBarItem(icon: Icon(Icons.feedback), label: 'Feedback'),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCard({
-    required String title,
-    required IconData icon,
-    required String content,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      margin: EdgeInsets.symmetric(vertical: 10),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.deepPurple, size: 30),
-        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(content),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: onTap,
       ),
     );
   }

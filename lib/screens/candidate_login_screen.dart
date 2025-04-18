@@ -66,27 +66,84 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
 
   Future<Map<String, dynamic>?> fetchCandidateData(String aadhaar) async {
     try {
-      final partySnapshots = await FirebaseFirestore.instance.collection(
-          'LOK_SABHA').get();
-      for (final party in partySnapshots.docs) {
-        final doc = await FirebaseFirestore.instance
-            .collection('LOK_SABHA')
-            .doc(party.id)
+      final electionStatusRef = FirebaseFirestore.instance
+          .collection('election_status')
+          .doc('lok_sabha');
+
+      // Step 1: Fetch all election subcollection IDs from /election_control/central_election_info
+      final centralElectionInfoDoc = await FirebaseFirestore.instance
+          .collection('election_control')
+          .doc('central_election_info')
+          .get();
+
+      final subCollectionIds = List<String>.from(
+          centralElectionInfoDoc.data()?['sub_collection_ids'] ?? []);
+
+      String selectedElectionId = '';
+      DateTime latestElectionDate = DateTime(1900);
+
+      // Step 2: Find latest completed election
+      for (final subColId in subCollectionIds) {
+        try {
+          final electionInfoDoc = await electionStatusRef
+              .collection(subColId)
+              .doc('election_info')
+              .get();
+
+          final data = electionInfoDoc.data();
+          if (data == null) continue;
+
+          final status = data['status'];
+          final rawDate = subColId.split('_')[2]; // Might be "04-18-2025" or "04-18-2025_21-07-52"
+          final cleanDate = rawDate.split('_')[0]; // Just the date part: "04-18-2025"
+          final parts = cleanDate.split('-');
+          final electionDate = DateTime.parse('${parts[2]}-${parts[0]}-${parts[1]}'); // "2025-04-18"
+
+          if (status == 'completed' && electionDate.isAfter(latestElectionDate)) {
+            selectedElectionId = subColId;
+            latestElectionDate = electionDate;
+          }
+        } catch (e) {
+          print("⚠️ Failed to read election $subColId: $e");
+        }
+      }
+
+      if (selectedElectionId.isEmpty) return null;
+
+      // Step 3: Get party list from the selected election and check each party
+      final partyListDoc = await electionStatusRef
+          .collection(selectedElectionId)
+          .doc('party')
+          .collection('list')
+          .get(); // Get all parties under the selected election
+
+      for (final partyDoc in partyListDoc.docs) {
+        final partyId = partyDoc.id;  // This would be the party ID (e.g., 'AAM', 'BJP', etc.)
+
+        // Check candidates under the current party
+        final candidateDoc = await electionStatusRef
+            .collection(selectedElectionId)
+            .doc('party')
+            .collection('list')
+            .doc(partyId)
             .collection('candidates')
             .doc(aadhaar)
             .get();
 
-        if (doc.exists) {
-          final data = doc.data()!;
-          data['party'] = party.id;
+        if (candidateDoc.exists) {
+          final data = candidateDoc.data();
+          data?['party'] = partyId;  // Add the party ID to the data
           return data;
         }
       }
+
+      return null;
     } catch (e) {
-      print("Firestore Error: $e");
+      print("🔥 Firestore fetch error: $e");
+      return null;
     }
-    return null;
   }
+
 
   void validateInputs() async {
     final aadhaar = aadhaarController.text.trim();
@@ -107,7 +164,7 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
 
     if (data == null) {
       _showMessage("No record found for this Aadhaar!");
-      generateCaptcha();
+
       return setState(() => isLoading = false);
     }
 
@@ -118,8 +175,8 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
     }
 
     String? phone =
-    data['phone']!= null ?"+91${data['phone']}":null;
-    int? age = int.tryParse(data['age'].toString());
+    data['phone_number']!= null ?"+91${data['phone_number']}":null;
+    int? age = int.tryParse(data['AGE'].toString());
 
     if (phone == null || age == null) {
       _showMessage("Incomplete candidate record.");
