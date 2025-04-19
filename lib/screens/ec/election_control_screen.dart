@@ -92,29 +92,62 @@ class _ElectionControlScreenState extends State<ElectionControlScreen>
 
 
   Future<void> _autoUpdateStatuses() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collectionGroup('election_info')
-        .get();
-
     final now = DateTime.now();
+    final lokSabhaDocRef = FirebaseFirestore.instance.collection('election_status').doc('lok_sabha');
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      final ref = doc.reference;
-      final status = data['status'];
+    for (final subColId in allSubCollectionIds) {
+      try {
+        final docRef = lokSabhaDocRef.collection(subColId).doc('election_info');
+        final docSnapshot = await docRef.get();
 
-      final nominationEnd = (data['nominations_end'] as Timestamp).toDate();
-      final pollingEnd = (data['polling_end'] as Timestamp).toDate();
+        if (!docSnapshot.exists) continue;
 
-      if (status == 'nominations_open' && now.isAfter(nominationEnd)) {
-        await ref.update({'status': 'polling_open'});
-      } else if (status == 'polling_open' && now.isAfter(pollingEnd)) {
-        await ref.update({'status': 'completed'});
+        final data = docSnapshot.data();
+        if (data == null) continue;
+
+        final status = data['status'] ?? '';
+
+        // Handle both Timestamp and String formats safely
+        DateTime? parseDate(dynamic value) {
+          if (value is Timestamp) return value.toDate();
+          if (value is String) return DateTime.tryParse(value);
+          return null;
+        }
+
+        final nominationEnd = parseDate(data['nominations_end']);
+        final pollingStart = parseDate(data['polling_start']);
+        final pollingEnd = parseDate(data['polling_end']);
+
+        if (nominationEnd == null || pollingStart == null || pollingEnd == null) {
+          print("⚠️ Skipping $subColId due to invalid date format");
+          continue;
+        }
+
+        String computedStatus = status;
+
+        if (status == 'nominations_open' && now.isAfter(nominationEnd)) {
+          computedStatus = 'polling_open';
+        } else if (status == 'polling_open' && now.isAfter(pollingEnd)) {
+          computedStatus = 'completed';
+        } else if (status == 'nominations_open' && now.isAfter(pollingStart)) {
+          computedStatus = 'polling_open';
+        }
+
+        if (computedStatus != status) {
+          await docRef.update({'status': computedStatus});
+        }
+
+      } catch (e) {
+        print("❌ Error auto-updating $subColId: $e");
       }
     }
 
-    await _fetchElections();
+    // Refresh UI only if still mounted
+    if (mounted) {
+      await _fetchElections();
+    }
   }
+
 
   // Step 1: Declare the list where all the election IDs are stored
 
@@ -270,24 +303,54 @@ class _ElectionControlScreenState extends State<ElectionControlScreen>
     );
   }
 
-  void _showElectionActions(Map<String, dynamic> election) {
+  void _showElectionActions(Map<String, dynamic> election) async {
+    final now = DateTime.now();
     final status = election['status'];
+    final electionType = election['election_type'];
+    final electionId = election['election_id'];
+
+    final docRef = FirebaseFirestore.instance
+        .collection('election_status')
+        .doc(electionType)
+        .collection(electionId)
+        .doc('election_info');
+
+    final nominationEnd = (election['nominations_end'] as Timestamp).toDate();
+    final pollingStart = (election['polling_start'] as Timestamp).toDate();
     final pollingEnd = (election['polling_end'] as Timestamp).toDate();
+
+    String computedStatus = status;
+
+    // 🕒 Determine time-based status changes
+    if (status == 'nominations_open' && now.isAfter(nominationEnd)) {
+      computedStatus = 'nominations_closed';
+      await docRef.update({'status': 'polling_open'});
+      computedStatus = 'polling_open';
+    } else if (status == 'polling_open' && now.isAfter(pollingEnd)) {
+      computedStatus = 'completed';
+      await docRef.update({'status': 'completed'});
+    } else if (status == 'nominations_open' && now.isAfter(pollingStart)) {
+      // Safety fallback if polling_start has passed but status wasn't updated
+      computedStatus = 'polling_open';
+      await docRef.update({'status': 'polling_open'});
+    }
+
+    // 👁️‍🗨️ Nice status display
+    String readableStatus = computedStatus.replaceAll('_', ' ').toUpperCase();
+    String extraNote = '';
+    if (computedStatus == 'nominations_closed') extraNote = '\n(Nominations Closed 🕑)';
+    if (computedStatus == 'polling_open') extraNote = '\n(Polling Started ✅)';
+    if (computedStatus == 'completed') extraNote = '\n(Polling Completed 🎉)';
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text("Election: ${election['election_type']}"),
-        content: Text("Status: ${status.replaceAll('_', ' ').toUpperCase()}"),
+        title: Text("Election: ${electionType.toUpperCase()}"),
+        content: Text("Status: $readableStatus$extraNote"),
         actions: [
-          if (widget.role == 'EC_HEAD' && status != 'completed')
+          if (widget.role == 'EC_HEAD' && computedStatus != 'completed')
             TextButton(
               onPressed: () async {
-                final docRef = FirebaseFirestore.instance
-                    .collection('election_status')
-                    .doc(election['election_type'])
-                    .collection(election['election_id'])
-                    .doc('election_info');
                 await docRef.update({'status': 'aborted'});
                 Navigator.pop(context);
                 _fetchElections();
@@ -297,11 +360,6 @@ class _ElectionControlScreenState extends State<ElectionControlScreen>
           if (widget.role == 'EC_DEPUTY_HEAD' && status == 'pending_approval') ...[
             TextButton(
               onPressed: () async {
-                final docRef = FirebaseFirestore.instance
-                    .collection('election_status')
-                    .doc(election['election_type'])
-                    .collection(election['election_id'])
-                    .doc('election_info');
                 await docRef.update({
                   'status': 'nominations_open',
                   'approvals.ec_deputy': true,
@@ -313,11 +371,6 @@ class _ElectionControlScreenState extends State<ElectionControlScreen>
             ),
             TextButton(
               onPressed: () async {
-                final docRef = FirebaseFirestore.instance
-                    .collection('election_status')
-                    .doc(election['election_type'])
-                    .collection(election['election_id'])
-                    .doc('election_info');
                 await docRef.update({
                   'status': 'rejected',
                   'approvals.ec_deputy': false,
@@ -332,6 +385,7 @@ class _ElectionControlScreenState extends State<ElectionControlScreen>
       ),
     );
   }
+
 
   Widget _buildElectionTile(Map<String, dynamic> election) {
     // Handle the timestamp conversion if it exists in the election map

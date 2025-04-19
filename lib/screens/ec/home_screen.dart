@@ -142,7 +142,95 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Scaffold( appBar: AppBar(
+      title: FutureBuilder<DocumentSnapshot>(
+        future: _fetchCandidateProfile(), // Fetch employee data
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 20,
+                  child: Icon(
+                    Icons.account_circle,
+                    size: 30,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Text("Loading...", style: TextStyle(fontSize: 20)),
+              ],
+            );
+          } else if (snapshot.hasError) {
+            return Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 20,
+                  child: Icon(
+                    Icons.account_circle,
+                    size: 30,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Text("Error loading data", style: TextStyle(fontSize: 20)),
+              ],
+            );
+          } else if (snapshot.hasData) {
+            var employeeData = snapshot.data?.data() as Map<String, dynamic>;
+            String employeeName = employeeData['name'] ?? "Unknown";
+            String employeeROLE = employeeData['role'] ?? "Unknown";
+            String employeeSTATE = employeeData['state'] ?? "Unknown";
+            employeeROLE=employeeROLE.replaceAll('_', ' ') ;
+            return Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 20,
+                  child: Icon(
+                    Icons.person,
+                    size: 30,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Welcome $employeeName",
+                        style: TextStyle(fontSize: 20)),
+                    Text(
+                      "$employeeROLE - $employeeSTATE",
+                      style: TextStyle(fontSize: 14, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          } else {
+            return Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 20,
+                  child: Icon(
+                    Icons.account_circle,
+                    size: 30,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Text("No Data Found", style: TextStyle(fontSize: 20)),
+              ],
+            );
+          }
+        },
+      ),
+      backgroundColor: Colors.blueAccent,
+      elevation: 0,
+    ),
       backgroundColor: Color(0xFFF5F7FA),
       body: FutureBuilder<DocumentSnapshot>(
         future: _fetchCandidateProfile(),
