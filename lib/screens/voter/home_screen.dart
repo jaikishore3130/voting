@@ -23,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentPage = 0;
   Timer? _timer;
   bool _isNominationEnabled = false;
+  final allSubCollectionIds = [];
 
 
   @override
@@ -30,7 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchUserProfile();
     _fetchNews();
-    _fetchNominationStatus(); // 🆕 fetch nomination flag
+    _fetchNominationStatus();
+// 🆕 fetch nomination flag
   }
 
 
@@ -53,16 +55,44 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   Future<void> _fetchNominationStatus() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('app_settings')
-        .doc('general')
+
+
+    final electionStatusRef = FirebaseFirestore.instance
+        .collection('election_status')
+        .doc('lok_sabha');
+
+    // Step 1: Fetch all election subcollection IDs from /election_control/central_election_info
+    final centralElectionInfoDoc = await FirebaseFirestore.instance
+        .collection('election_control')
+        .doc('central_election_info')
         .get();
-    if (doc.exists) {
-      setState(() {
-        _isNominationEnabled = doc['nomination_enabled'] == true;
-      });
-    }
-  }
+
+    final subCollectionIds = List<String>.from(
+        centralElectionInfoDoc.data()?['sub_collection_ids'] ?? []);
+
+    String selectedElectionId = '';
+    DateTime latestElectionDate = DateTime(1900);
+
+    // Step 2: Find latest completed election
+    for (final subColId in subCollectionIds) {
+
+      final electionInfoDoc = await electionStatusRef
+          .collection(subColId)
+          .doc('election_info')
+          .get();
+
+      final data = electionInfoDoc.data();
+      if (data == null) continue;
+
+      final status = data['status'];
+
+      // Step 4: Check if the nomination is open and show the nomination button
+      if (status=="nominations_open") {
+        setState(() {
+          _isNominationEnabled = true; // Enable the nomination button
+        });
+      }
+    }}
 
   Future<void> _fetchNews() async {
     final url = Uri.parse(
@@ -241,6 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          SizedBox(height: 15),
           if (_isNominationEnabled)
             ElevatedButton.icon(
               onPressed: () {
@@ -254,8 +285,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              icon: Icon(Icons.how_to_vote),
-              label: Text("Submit Nomination"),
+              icon: Icon(Icons.how_to_vote,color: Colors.white,),
+              label: Text("Submit Nomination",style:TextStyle(color: Colors.white),),
             ),
 
           SizedBox(height: 20),
