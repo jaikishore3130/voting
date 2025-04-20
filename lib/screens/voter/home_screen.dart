@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:voting/screens/candidate/nomination_tab.dart';
 import 'package:voting/screens/nomination_screen.dart';
 class HomeScreen extends StatefulWidget {
   final String aadhaarNumber;
@@ -274,20 +275,42 @@ class _HomeScreenState extends State<HomeScreen> {
           SizedBox(height: 15),
           if (_isNominationEnabled)
             ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => NominationScreen(aadhaarNumber: widget.aadhaarNumber,)),
-                );
+              onPressed: () async {
+                // Check if the user already has a nomination in Firestore
+                final nominationRef = FirebaseFirestore.instance.collection('nominations');
+                final userNomination = await nominationRef.doc(widget.aadhaarNumber).get();
+
+                if (userNomination.exists) {
+                  // If the nomination already exists, navigate to the NominationStatusScreen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => NominationTab()),
+                  );
+                } else {
+                  // If no nomination exists, navigate to the NominationScreen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NominationScreen(aadhaarNumber: widget.aadhaarNumber),
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple,
                 padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              icon: Icon(Icons.how_to_vote,color: Colors.white,),
-              label: Text("Submit Nomination",style:TextStyle(color: Colors.white),),
+              icon: Icon(
+                Icons.how_to_vote,
+                color: Colors.white,
+              ),
+              label: Text(
+                "Submit Nomination",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
+
 
           SizedBox(height: 20),
           Text(

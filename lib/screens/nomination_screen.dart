@@ -1,8 +1,15 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:voting/screens/candidate/nomination_tab.dart';
+
 import 'package:voting/screens/otp_screen.dart';
 
 class NominationScreen extends StatefulWidget {
@@ -20,6 +27,8 @@ class _NominationScreenState extends State<NominationScreen> {
   final picker = ImagePicker();
   File? _photo;
   File? _video;
+  String? photoUrl;
+  String? videoUrl;
 
   final _nameController = TextEditingController();
   final _fatherNameController = TextEditingController();
@@ -40,21 +49,72 @@ class _NominationScreenState extends State<NominationScreen> {
   final List<String> parties = ['BJP', 'INC', 'AAP', 'CPI', 'Independent'];
 
   int? _calculatedAge;
-
   bool _isPhoneVerified = false;
 
-  Future<void> _pickPhoto() async {
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() => _photo = File(pickedFile.path));
+  Future<File> encryptFile(File file, String aadhaar, String fileType) async {
+    final key = encrypt.Key.fromUtf8('28212821282128212821282128212821');
+    final iv = encrypt.IV.fromUtf8('3031303130313031');
+    final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+
+    final inputBytes = await file.readAsBytes();
+    final encrypted = encrypter.encryptBytes(inputBytes, iv: iv);
+
+    final encryptedFileName = '${aadhaar}_$fileType.enc';
+    final dir = await getTemporaryDirectory();
+    final encryptedFile = File(path.join(dir.path, encryptedFileName));
+    await encryptedFile.writeAsBytes(encrypted.bytes);
+
+    print('Encrypted file saved to: ${encryptedFile.path}');
+    return encryptedFile;
+  }
+
+  Future<String?> uploadToGitHub(File file, String filename) async {
+    final token = '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';
+    final repoOwner = 'jaikishore3130';
+    final repoName = 'encrypted-profile-images';
+
+    final url = 'https://api.github.com/repos/$repoOwner/$repoName/contents/$filename';
+    final content = base64Encode(await file.readAsBytes());
+
+    final body = jsonEncode({
+      'message': 'Upload encrypted file $filename',
+      'content': content,
+    });
+
+    final response = await http.put(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/vnd.github+json',
+      },
+      body: body,
+    );
+
+    if (response.statusCode == 201) {
+      final json = jsonDecode(response.body);
+      return json['content']['download_url'];
+    } else {
+      print('❌ Failed to upload: ${response.statusCode} ${response.body}');
+      return null;
     }
   }
 
-  Future<void> _captureVideo() async {
+  Future<void> _pickPhoto(String aadhaar) async {
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      _photo = File(pickedFile.path);
+      final encryptedFile = await encryptFile(_photo!, aadhaar, 'NP');
+      photoUrl = await uploadToGitHub(encryptedFile, '${aadhaar}_NP.enc');
+    }
+  }
+
+  Future<void> _captureVideo(String aadhaar) async {
     final pickedVideo = await picker.pickVideo(source: ImageSource.camera);
     if (pickedVideo != null) {
-      setState(() => _video = File(pickedVideo.path));
+      _video = File(pickedVideo.path);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🎥 Video captured')));
+      final encryptedFile = await encryptFile(_video!, aadhaar, 'NV');
+      videoUrl = await uploadToGitHub(encryptedFile, '${aadhaar}_NV.enc');
     }
   }
 
@@ -71,7 +131,6 @@ class _NominationScreenState extends State<NominationScreen> {
       setState(() => _calculatedAge = DateTime.now().year - pickedDate.year);
     }
   }
-
 
   Widget _buildTextField(TextEditingController controller, String label,
       {TextInputType type = TextInputType.text, bool isPassword = false, String? validatorText}) {
@@ -102,21 +161,21 @@ class _NominationScreenState extends State<NominationScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _selectDOB,
                   icon: Icon(Icons.calendar_today),
-                  label: Text(
-                    _dobController.text.isEmpty ? 'Select DOB' : _dobController.text,
-                  ),
+                  label: Text(_dobController.text.isEmpty ? 'Select DOB' : _dobController.text),
                 ),
               ),
-              SizedBox(width: 12),
               if (_calculatedAge != null)
-                Text('Age: $_calculatedAge', style: TextStyle(fontSize: 16)),
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Text('Age: $_calculatedAge'),
+                ),
             ],
           ),
           _buildTextField(_educationController, 'Education'),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Gender', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              Text('Gender', style: TextStyle(fontSize: 16)),
               Row(
                 children: ['MALE', 'FEMALE', 'OTHERS'].map((gender) {
                   return Row(
@@ -124,24 +183,17 @@ class _NominationScreenState extends State<NominationScreen> {
                       Radio<String>(
                         value: gender,
                         groupValue: _selectedGender,
-                        onChanged: (value) {
-                          setState(() => _selectedGender = value);
-                        },
+                        onChanged: (value) => setState(() => _selectedGender = value),
                       ),
                       Text(gender),
-                      SizedBox(width: 10),
                     ],
                   );
                 }).toList(),
               ),
               if (_selectedGender == 'OTHERS')
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: _buildTextField(TextEditingController(), 'Please specify', validatorText: 'Required'),
-                ),
+                _buildTextField(TextEditingController(), 'Please specify'),
             ],
           ),
-
         ],
       ),
     ),
@@ -181,17 +233,13 @@ class _NominationScreenState extends State<NominationScreen> {
                   MaterialPageRoute(
                     builder: (_) => OtpScreen(
                       phoneNumber: "+91${_phoneController.text.trim()}",
-                      aadhaarNumber: widget.aadhaarNumber, // ensure you have this controller
+                      aadhaarNumber: widget.aadhaarNumber,
                       userType: 'nomination',
                     ),
                   ),
                 );
-
                 if (result == true) {
-                  setState(() {
-                    _isPhoneVerified = true;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Phone number verified!")));
+                  setState(() => _isPhoneVerified = true);
                 }
               },
               child: Text('Verify Phone Number'),
@@ -203,23 +251,20 @@ class _NominationScreenState extends State<NominationScreen> {
         ],
       ),
     ),
-
     Step(
       title: Text('e-KYC'),
       isActive: _currentStep >= 3,
       content: Column(
         children: [
-          _photo != null
-              ? Image.file(_photo!, height: 120)
-              : Text('No photo selected'),
+          _photo != null ? Image.file(_photo!, height: 100) : Text('No photo selected'),
           ElevatedButton.icon(
-            onPressed: _pickPhoto,
-            icon: Icon(Icons.upload_file),
+            onPressed: () => _pickPhoto(widget.aadhaarNumber),
+            icon: Icon(Icons.image),
             label: Text('Upload Photo'),
           ),
           SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: _captureVideo,
+            onPressed: () => _captureVideo(widget.aadhaarNumber),
             icon: Icon(Icons.videocam),
             label: Text(_video != null ? 'Video Captured ✅' : 'Capture Face Video'),
           ),
@@ -229,28 +274,44 @@ class _NominationScreenState extends State<NominationScreen> {
   ];
 
   Future<void> _submitNomination() async {
-    if (_formKey.currentState!.validate()) {
-      // Store the data in Firestore
-      await FirebaseFirestore.instance.collection('nominations').add({
-        'name': _nameController.text,
-        'father_name': _fatherNameController.text,
-        'mother_name': _motherNameController.text,
-        'dob': _dobController.text,
-        'education': _educationController.text,
-        'address': _addressController.text,
-        'phone': _phoneController.text,
-        'gender': _selectedGender,
-        'state': _selectedState,
-        'party': _selectedParty,
-        'constituency': _constituencyController.text,
-        'photo': _photo?.path,  // Store photo path or URL here
-        'video': _video?.path,  // Store video path or URL here
-      });
+    final nominationRef = FirebaseFirestore.instance.collection('nominations');
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Nomination Submitted')));
-      // Optionally navigate to the next screen or show a confirmation.
+    // Check if the nomination already exists for this Aadhaar number
+    final existingNomination = await nominationRef.doc(widget.aadhaarNumber).get();
+
+    if (existingNomination.exists) {
+      // Navigate to the status screen if nomination already exists
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => NominationTab()),
+      );
+      return;
     }
+
+    // Save the nomination
+    await nominationRef.doc(widget.aadhaarNumber).set({
+      'name': _nameController.text,
+      'father_name': _fatherNameController.text,
+      'mother_name': _motherNameController.text,
+      'dob': _dobController.text,
+      'education': _educationController.text,
+      'address': _addressController.text,
+      'phone': _phoneController.text,
+      'gender': _selectedGender,
+      'state': _selectedState,
+      'party': _selectedParty,
+      'constituency': _constituencyController.text,
+      'photo': photoUrl,
+      'video': videoUrl,
+    });
+
+    // Navigate to NominationStatusScreen
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NominationTab()),
+    );
   }
+
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0:
@@ -266,8 +327,7 @@ class _NominationScreenState extends State<NominationScreen> {
             _selectedParty != null;
       case 2:
         if (!_isPhoneVerified) return false;
-        return _phoneController.text.isNotEmpty &&
-            _passwordController.text.isNotEmpty &&
+        return _passwordController.text.isNotEmpty &&
             _confirmPasswordController.text == _passwordController.text;
       case 3:
         return _photo != null && _video != null;
@@ -279,31 +339,25 @@ class _NominationScreenState extends State<NominationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Nomination Form')),
-      body: Form(
-      key: _formKey,
-      child:
-    Stepper(
+      appBar: AppBar(title: Text('Nomination')),
+      body: Stepper(
         currentStep: _currentStep,
-      onStepContinue: () {
-        if (_validateCurrentStep()) {
-          if (_currentStep < _buildSteps().length - 1) {
-            setState(() => _currentStep++);
-          } else {
-            _submitNomination();
+        onStepContinue: () {
+          if (_validateCurrentStep()) {
+            if (_currentStep == 3) {
+              _submitNomination();
+            } else {
+              setState(() => _currentStep++);
+            }
           }
-        }
-      },
-
-
-      onStepCancel: () {
+        },
+        onStepCancel: () {
           if (_currentStep > 0) {
             setState(() => _currentStep--);
           }
         },
         steps: _buildSteps(),
-        type: StepperType.vertical,
       ),
-    ),);
+    );
   }
 }

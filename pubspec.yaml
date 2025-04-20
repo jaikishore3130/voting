@@ -75,8 +75,8 @@ flutter:
 
   assets:
     - assets/images/logo.jpg
-    - assets/images/aalogo.png
-    - assets/images/otplogo.jpg
+
+
     - assets/animations/login_animation.json
     - assets/animations/otp_animation.json
     - assets/animations/lock.json
