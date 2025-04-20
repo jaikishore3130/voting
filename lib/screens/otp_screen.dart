@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import 'package:twilio_flutter/twilio_flutter.dart';
 import 'package:voting/screens/SetNewPasswordScreen.dart';
+import 'package:voting/screens/nomination_screen.dart';
 import 'package:voting/screens/voter/voter_dashboard.dart';
 import 'candidate_dashboard.dart';
 import 'ec_dashboard.dart';
@@ -108,7 +109,11 @@ class _OtpScreenState extends State<OtpScreen> {
   void _verifyOtp() {
     String enteredOtp = _otpControllers.map((c) => c.text).join();
     if (enteredOtp == generatedOtp) {
-      _navigateToDashboard();
+      if (widget.userType == "nomination") {
+        Navigator.pop(context, true); // return to nomination screen stepper
+      } else {
+        _navigateToDashboard();
+      }
     } else {
       _showMessage("Invalid OTP! Please try again.");
     }
@@ -151,7 +156,14 @@ class _OtpScreenState extends State<OtpScreen> {
           builder: (_) => EcEmployeeDashboard(aadhaarNumber: widget.aadhaarNumber, role: '${data?['role']}', state: '${data?['state']}',),
         ),
       );
-    } else {
+    } else if (widget.userType == "nomination") {
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => NominationScreen(aadhaarNumber: widget.aadhaarNumber,),
+        ),
+      );}else {
       _showMessage("Invalid user type!");
     }
   }

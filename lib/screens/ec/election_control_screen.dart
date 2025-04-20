@@ -32,9 +32,10 @@ class _ElectionControlScreenState extends State<ElectionControlScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _fetchSubCollectionIds();  // Fetch the stored election IDs
-    _fetchElections();
-    _timer = Timer.periodic(Duration(seconds: 10), (_) => _autoUpdateStatuses());
+    _fetchSubCollectionIds().then((_) {
+      _streamElectionStatusChanges(); // Start listening after fetching IDs
+      _fetchElections(); // Initial load
+    });
   }
 
 
@@ -43,6 +44,53 @@ class _ElectionControlScreenState extends State<ElectionControlScreen>
     _timer?.cancel();
     super.dispose();
   }
+  void _streamElectionStatusChanges() {
+    final lokSabhaDocRef = FirebaseFirestore.instance.collection('election_status').doc('lok_sabha');
+
+    for (final subColId in allSubCollectionIds) {
+      lokSabhaDocRef.collection(subColId).doc('election_info').snapshots().listen((snapshot) async {
+        if (!snapshot.exists) return;
+
+        final data = snapshot.data();
+        if (data == null) return;
+
+        final now = DateTime.now();
+        final status = data['status'];
+
+        DateTime? parseDate(dynamic value) {
+          if (value is Timestamp) return value.toDate();
+          if (value is String) return DateTime.tryParse(value);
+          return null;
+        }
+
+        final nominationEnd = parseDate(data['nominations_end']);
+        final pollingStart = parseDate(data['polling_start']);
+        final pollingEnd = parseDate(data['polling_end']);
+
+        if (nominationEnd == null || pollingStart == null || pollingEnd == null) return;
+
+        String newStatus = status;
+
+        if (status == 'nominations_open' && now.isAfter(nominationEnd)) {
+          newStatus = 'polling_open';
+        } else if (status == 'polling_open' && now.isAfter(pollingEnd)) {
+          newStatus = 'completed';
+        } else if (status == 'nominations_open' && now.isAfter(pollingStart)) {
+          newStatus = 'polling_open';
+        }
+
+        // ✅ Only update Firestore if status has changed
+        if (newStatus != status) {
+          await snapshot.reference.update({'status': newStatus});
+          print("✅ Status for $subColId updated to $newStatus");
+        }
+
+        // Refresh UI
+        if (mounted) _fetchElections();
+      });
+    }
+  }
+
 
   Future<void> _fetchElections() async {
     final ongoing = <Map<String, dynamic>>[];
