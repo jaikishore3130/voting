@@ -25,20 +25,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _timer;
   bool _isNominationEnabled = false;
   final allSubCollectionIds = [];
-
+  String? _activeSubColId;
+  Timer? _nominationTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchUserProfile();
     _fetchNews();
-    _fetchNominationStatus(); // 🆕 fetch nomination flag
+    _fetchNominationStatus();
+    _nominationTimer = Timer.periodic(Duration(seconds: 10), (Timer timer) {
+      _fetchNominationStatus();
+    });// 🆕 fetch nomination flag
   }
 
 
   @override
   void dispose() {
     _timer?.cancel();
+    _nominationTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -131,45 +136,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   Future<void> _fetchNominationStatus() async {
+    final electionStatusRef = FirebaseFirestore.instance
+        .collection('election_status')
+        .doc('lok_sabha');
 
+    final centralElectionInfoDoc = await FirebaseFirestore.instance
+        .collection('election_control')
+        .doc('central_election_info')
+        .get();
 
-      final electionStatusRef = FirebaseFirestore.instance
-          .collection('election_status')
-          .doc('lok_sabha');
+    final subCollectionIds = List<String>.from(
+        centralElectionInfoDoc.data()?['sub_collection_ids'] ?? []);
 
-      // Step 1: Fetch all election subcollection IDs from /election_control/central_election_info
-      final centralElectionInfoDoc = await FirebaseFirestore.instance
-          .collection('election_control')
-          .doc('central_election_info')
+    for (final subColId in subCollectionIds) {
+      final electionInfoDoc = await electionStatusRef
+          .collection(subColId)
+          .doc('election_info')
           .get();
 
-      final subCollectionIds = List<String>.from(
-          centralElectionInfoDoc.data()?['sub_collection_ids'] ?? []);
+      final data = electionInfoDoc.data();
+      if (data == null) continue;
 
-      String selectedElectionId = '';
-      DateTime latestElectionDate = DateTime(1900);
+      final status = data['status'];
 
-      // Step 2: Find latest completed election
-      for (final subColId in subCollectionIds) {
-
-          final electionInfoDoc = await electionStatusRef
-              .collection(subColId)
-              .doc('election_info')
-              .get();
-
-          final data = electionInfoDoc.data();
-          if (data == null) continue;
-
-          final status = data['status'];
-
-    // Step 4: Check if the nomination is open and show the nomination button
-    if (status=="nominations_open") {
-      setState(() {
-        _isNominationEnabled = true; // Enable the nomination button
-      });
+      if (status == "nominations_open") {
+        setState(() {
+          _isNominationEnabled = true;
+          _activeSubColId = subColId; // ✅ Store the active subColId
+        });
+        break; // Only take the first active nomination open
+      }
     }
-  }}
-
+  }
   Future<void> _fetchNews() async {
     final url = Uri.parse(
         "https://newsapi.org/v2/everything?q=politics%20india&sortBy=publishedAt&language=en&apiKey=a3f1989aed15478ba01410509c7a239f");
@@ -353,14 +351,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   // If the nomination already exists, navigate to the NominationStatusScreen
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => NominationTab()),
+                    MaterialPageRoute(builder: (context) => NominationTab(aadhaarNumber:widget.aadhaarNumber, subCollectionId:  _activeSubColId!, )),
                   );
                 } else {
                   // If no nomination exists, navigate to the NominationScreen
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => NominationScreen(aadhaarNumber: widget.aadhaarNumber),
+                      builder: (context) => NominationScreen(aadhaarNumber:widget.aadhaarNumber, subCollectionId:  _activeSubColId!,),
                     ),
                   );
                 }

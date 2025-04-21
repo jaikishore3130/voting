@@ -14,7 +14,8 @@ import 'package:voting/screens/otp_screen.dart';
 
 class NominationScreen extends StatefulWidget {
   final String aadhaarNumber;
-  const NominationScreen({required this.aadhaarNumber, Key? key}) : super(key: key);
+  final String subCollectionId;
+  const NominationScreen({required this.aadhaarNumber, Key? key, required this.subCollectionId}) : super(key: key);
 
   @override
   State<NominationScreen> createState() => _NominationScreenState();
@@ -274,7 +275,7 @@ class _NominationScreenState extends State<NominationScreen> {
   ];
 
   Future<void> _submitNomination() async {
-    final nominationRef = FirebaseFirestore.instance.collection('nominations');
+    final nominationRef = FirebaseFirestore.instance.collection('nominations').doc('list').collection(widget.subCollectionId);
 
     // Check if the nomination already exists for this Aadhaar number
     final existingNomination = await nominationRef.doc(widget.aadhaarNumber).get();
@@ -283,7 +284,7 @@ class _NominationScreenState extends State<NominationScreen> {
       // Navigate to the status screen if nomination already exists
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => NominationTab()),
+        MaterialPageRoute(builder: (_) => NominationTab(aadhaarNumber:widget.aadhaarNumber, subCollectionId: widget.subCollectionId,)),
       );
       return;
     }
@@ -303,12 +304,14 @@ class _NominationScreenState extends State<NominationScreen> {
       'constituency': _constituencyController.text,
       'photo': photoUrl,
       'video': videoUrl,
+      'ec_head':false,
+      'ec_deputy_head':false
     });
 
     // Navigate to NominationStatusScreen
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NominationTab()),
+      MaterialPageRoute(builder: (_) => NominationTab(aadhaarNumber:widget.aadhaarNumber, subCollectionId: widget.subCollectionId,)),
     );
   }
 

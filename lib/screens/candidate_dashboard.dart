@@ -57,7 +57,7 @@ class _CandidateDashboardState extends State<CandidateDashboard> {
           HomeScreen( aadhaarNumber: widget.aadhaarNumber,),
           CampaignTab(),
           ElectionInfoTab(),
-          NominationTab(),
+          NominationTab(aadhaarNumber: '', subCollectionId: '',),
           FeedbackTab(),
         ]);
       });

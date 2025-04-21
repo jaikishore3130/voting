@@ -156,14 +156,7 @@ class _OtpScreenState extends State<OtpScreen> {
           builder: (_) => EcEmployeeDashboard(aadhaarNumber: widget.aadhaarNumber, role: '${data?['role']}', state: '${data?['state']}',),
         ),
       );
-    } else if (widget.userType == "nomination") {
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => NominationScreen(aadhaarNumber: widget.aadhaarNumber,),
-        ),
-      );}else {
+    } else {
       _showMessage("Invalid user type!");
     }
   }

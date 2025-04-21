@@ -31,12 +31,12 @@ class _EcEmployeeDashboardState extends State<EcEmployeeDashboard> {
     super.initState();
     // Initialize the tabs after the widget's initialization
     _tabs.addAll([
-      HomeScreen(aadhaarNumber: widget.aadhaarNumber),
-      // Pass the aadhaarNumber here
-      ElectionControlScreen(role: widget.role, uid: widget.aadhaarNumber,),
-      NominationsApprovalScreen(),
-      FeedbackScreen(),
+      Builder(builder: (_) => HomeScreen(aadhaarNumber: widget.aadhaarNumber)),
+      Builder(builder: (_) => ElectionControlScreen(role: widget.role, uid: widget.aadhaarNumber)),
+      Builder(builder: (_) => NominationsApprovalScreen(subCollectionId: 'lok_sabha_04-20-2025_20-48-11', aadhaarNumber: widget.aadhaarNumber,role:widget.role)),
+      Builder(builder: (_) => FeedbackScreen()),
     ]);
+
   }
 
   Future<DocumentSnapshot> _fetchCandidateProfile() async {
