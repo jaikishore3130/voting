@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:voting/screens/voter_login_screen.dart';
+import 'package:voting/screens/voting_screen.dart';
+import 'package:voting/services/biometric_service.dart';
 
 class VoteNowScreen extends StatefulWidget {
   const VoteNowScreen({Key? key}) : super(key: key);
@@ -8,7 +11,8 @@ class VoteNowScreen extends StatefulWidget {
   _VoteNowScreenState createState() => _VoteNowScreenState();
 }
 
-class _VoteNowScreenState extends State<VoteNowScreen> {
+class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   List<Map<String, dynamic>> ongoingElections = [];
   List<Map<String, dynamic>> upcomingElections = [];
   List<String> allSubCollectionIds = [];
@@ -16,10 +20,18 @@ class _VoteNowScreenState extends State<VoteNowScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _fetchSubCollectionIds().then((_) {
       _fetchElections();
     });
   }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
 
   Future<void> _fetchSubCollectionIds() async {
     final electionControlRef = FirebaseFirestore.instance
@@ -130,206 +142,226 @@ class _VoteNowScreenState extends State<VoteNowScreen> {
   }
 
   void _navigateToVotingScreen(Map<String, dynamic> election) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Navigating to voting screen...")),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VotingScreen(election: election),
+      ),
     );
   }
-
-  Future<List<Map<String, dynamic>>> fetchAllParties() async {
-    final List<Map<String, dynamic>> partyList = [];
-
+  Future<List<Map<String, dynamic>>> _fetchAllCandidates(String subColId) async {
     try {
-      final partiesSnapshot = await FirebaseFirestore.instance
+      final electionStatusRef = FirebaseFirestore.instance
           .collection('election_status')
-          .doc('lok_sabha')
-          .collection('lok_sabha_04-22-2025_02-45-04')
-          .doc('election_info')
-          .collection('parties')
+          .doc('lok_sabha');
+
+      // Step 1: Fetch party list under the given election
+      final partyListDoc = await electionStatusRef
+          .collection(subColId)
+          .doc('party')
+          .collection('list')
           .get();
 
-      print('📦 Total Parties Fetched: ${partiesSnapshot.docs.length}');
+      List<Map<String, dynamic>> allCandidates = [];
 
-      for (var doc in partiesSnapshot.docs) {
-        final partyData = doc.data();
-        partyList.add({
-          'party_id': doc.id, // Party ID is used as party name
-          ...partyData,
-        });
+      for (final partyDoc in partyListDoc.docs) {
+        final partyId = partyDoc.id;
+        final candidatesSnapshot = await electionStatusRef
+            .collection(subColId)
+            .doc('party')
+            .collection('list')
+            .doc(partyId)
+            .collection('candidates')
+            .get();
+
+        for (final candidateDoc in candidatesSnapshot.docs) {
+          print("$candidateDoc");
+          final candidateData = candidateDoc.data();
+          candidateData['party'] = partyId;
+          allCandidates.add(candidateData);
+        }
       }
 
-      print('📋 All Parties:');
-      for (var party in partyList) {
-        print(party);
-      }
+      print("✅ All Candidates Fetched: $allCandidates");
+      return allCandidates;
+
     } catch (e) {
-      print('❌ Error fetching parties: $e');
+      print("🔥 Firestore fetch error: $e");
+      return [];
     }
-
-    return partyList;
   }
-
   void _showCandidates(Map<String, dynamic> election) async {
-    final subColId = election['election_id'] ?? 'lok_sabha_04-22-2025_02-45-04'; // fallback if null
+    final subColId = election['election_id'] ?? 'lok_sabha_04-22-2025_11-10-56';
     print('🧭 Using SubCollection ID: $subColId');
 
     final candidateWidgets = <Widget>[];
 
     try {
-      // Fetch all parties using the fetchAllParties function
-      final partiesList = await fetchAllParties();
+      final allCandidates = await _fetchAllCandidates(subColId);
 
-      if (partiesList.isEmpty) {
-        print("⚠️ No parties found in: $subColId");
-        candidateWidgets.add(const ListTile(title: Text('No parties found')));
+      if (allCandidates.isEmpty) {
+        print("⚠️ No candidates found in: $subColId");
+        candidateWidgets.add(const ListTile(title: Text('No candidates found')));
       }
 
-      // Loop through each party and fetch its candidates
-      for (final party in partiesList) {
-        final partyName = party['party_id']; // Party name is the document ID
-        final candidatesPath = FirebaseFirestore.instance
-            .collection('election_status')
-            .doc('lok_sabha')
-            .collection(subColId)
-            .doc('election_info')
-            .collection('parties')
-            .doc(partyName) // Fetching party-specific candidates
-            .collection('candidates');
+      for (final candidateData in allCandidates) {
+        final candidateName = candidateData['name'] ?? 'Unknown';
+        final partyName = candidateData['party'] ?? 'Unknown';
+        final aadhaarNumber = candidateData['aadhaar_number'] ?? 'Unknown';
 
-        print('🏛️ Party: $partyName - Fetching candidates...');
+        print('🧑 Candidate: $candidateName - Aadhaar: $aadhaarNumber');
 
-        final candidatesSnapshot = await candidatesPath.get();
-        final candidateDocs = candidatesSnapshot.docs;
-
-        if (candidateDocs.isEmpty) {
-          print("⚠️ No candidates under party: $partyName");
-          continue;
-        }
-
-        for (final candidateDoc in candidateDocs) {
-          final candidateData = candidateDoc.data();
-          final candidateName = candidateData['name'] ?? 'Unknown';
-          final aadhaarNumber = candidateDoc.id;
-
-          print('🧑 Candidate: $candidateName - Aadhaar: $aadhaarNumber');
-
-          candidateWidgets.add(
-            ListTile(
-              title: Text(candidateName),
-              subtitle: Text('$partyName - Aadhaar: $aadhaarNumber'),
-              onTap: () => _showCandidateDetails(candidateData),
-            ),
-          );
-        }
+        candidateWidgets.add(
+          ListTile(
+            title: Text(candidateName),
+            subtitle: Text('$partyName - Aadhaar: $aadhaarNumber'),
+            onTap: () => _showCandidateDetails(candidateData),
+          ),
+        );
       }
 
-      // Handle case where no candidates found at all
       if (candidateWidgets.isEmpty) {
-        candidateWidgets.add(const ListTile(
-          title: Text('No candidates found'),
-        ));
+        candidateWidgets.add(const ListTile(title: Text('No candidates found')));
       }
 
-      // Show dialog with the list of candidates
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text("Candidates"),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 400,
-            child: ListView(children: candidateWidgets),
-          ),
+          title: const Text('Candidates'),
+          content: SingleChildScrollView(child: Column(children: candidateWidgets)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Close"),
+              child: const Text('Close'),
             ),
           ],
         ),
       );
     } catch (e) {
-      print("❌ Error fetching candidates: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to load candidates")),
-      );
+      print("⚠️ Failed to fetch candidates: $e");
     }
   }
 
-
-  void _showCandidateDetails(Map<String, dynamic> candidate) {
+  void _showCandidateDetails(Map<String, dynamic> candidateData) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(candidate['name'] ?? 'Candidate Details'),
+        title: Text(candidateData['name'] ?? 'Candidate Details'),
         content: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Party: ${candidate['party'] ?? 'N/A'}'),
-            Text('Constituency: ${candidate['constituency'] ?? 'N/A'}'),
-            Text('Age: ${candidate['age'] ?? 'N/A'}'),
-            Text('Education: ${candidate['education'] ?? 'N/A'}'),
-            Text('Criminal Records: ${candidate['criminal_records'] ?? 'None'}'),
+            Text('Party: ${candidateData['party'] ?? 'Unknown'}'),
+            Text('Aadhaar: ${candidateData['aadhaar_number'] ?? 'Unknown'}'),
+            // Add any other candidate details here
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
   }
 
-  Widget buildElectionList(String type) {
-    final elections = type == 'ongoing' ? ongoingElections : upcomingElections;
+  void _showElectionPopup({
+    required Map<String, dynamic> election,
+    required bool isOngoing,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                election['election_type'] ?? 'Election',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (isOngoing) ...[
+              ElevatedButton(
+                onPressed: () async {
+                  final loginSuccess = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) =>  VoterLoginScreen()),
+                  );
 
-    if (elections.isEmpty) {
-      return Center(child: Text("No ${type == 'upcoming' ? 'upcoming' : 'ongoing'} elections found."));
-    }
+                  if (loginSuccess == true) {
+                    final biometricSuccess = await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const BiometricAuthScreen()),
+                    );
 
-    return ListView.builder(
-      itemCount: elections.length,
-      itemBuilder: (context, index) {
-        final election = elections[index];
-        return ListTile(
-          leading: const Icon(Icons.how_to_vote, color: Colors.blue),
-          title: Text(
-            election['election_type']?.toString().toUpperCase() ?? 'ELECTION',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Text(
-            type == 'ongoing'
-                ? "Ends: ${(election['polling_end'] as Timestamp?)?.toDate()}"
-                : "Starts: ${(election['polling_start'] as Timestamp?)?.toDate()}",
-          ),
-          onTap: () => type == 'ongoing'
-              ? _showOngoingPopup(election)
-              : _showUpcomingPopup(election),
-        );
-      },
+                    if (biometricSuccess == true) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => VotingScreen(election: election['election_type']),
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Vote Now'),
+              ),
+
+            ],
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showCandidates(election);
+              },
+              child: const Text('Show Candidates'),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Vote Now'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Ongoing'),
+            Tab(text: 'Upcoming'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
         children: [
-          const TabBar(
-            labelColor: Colors.blue,
-            unselectedLabelColor: Colors.grey,
-            tabs: [
-              Tab(text: "Ongoing"),
-              Tab(text: "Upcoming"),
-            ],
+          ListView(
+            children: ongoingElections.map((election) => ListTile(
+              title: Text(election['election_type'] ?? 'Election'),
+              subtitle: Text('Polling Starts: ${election['polling_start'].toDate()}'),
+              onTap: () => _showElectionPopup(election: election, isOngoing: true),
+            )).toList(),
           ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                buildElectionList('ongoing'),
-                buildElectionList('upcoming'),
-              ],
-            ),
+          ListView(
+            children: upcomingElections.map((election) => ListTile(
+              title: Text(election['election_type'] ?? 'Election'),
+              subtitle: Text('Polling Starts: ${election['polling_start'].toDate()}'),
+              onTap: () => _showElectionPopup(election: election, isOngoing: false),
+            )).toList(),
           ),
         ],
       ),

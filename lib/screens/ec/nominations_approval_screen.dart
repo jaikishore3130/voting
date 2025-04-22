@@ -109,6 +109,20 @@ class _NominationsApprovalScreenState extends State<NominationsApprovalScreen> {
 
     await docRefff.set(data);
 
+      final electionControlRef = FirebaseFirestore.instance.collection('aa').doc('list');
+      final docSnapshot = await electionControlRef.get();
+
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data();
+        if (data != null && data.containsKey('sub_collection_ids')) {
+          setState(() {
+            allSubCollectionIds.addAll(List<String>.from(data[aadhaar]));
+          });
+        }
+      }
+
+
+
     final docRef = FirebaseFirestore.instance
         .collection('nominations')
         .doc('list')

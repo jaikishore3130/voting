@@ -351,6 +351,7 @@ class _ElectionControlScreenState extends State<ElectionControlScreen>
     );
   }
 
+
   void _showElectionActions(Map<String, dynamic> election) async {
     final now = DateTime.now();
     final status = election['status'];
