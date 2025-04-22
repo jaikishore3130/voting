@@ -18,6 +18,8 @@ class NominationTab extends StatefulWidget {
 class _NominationTabState extends State<NominationTab> {
   String _statusMessage = "Fetching nomination status...";
   String? _rejectionReason;
+  Color _statusColor = Colors.grey;
+  IconData _statusIcon = Icons.hourglass_top;
 
   @override
   void initState() {
@@ -28,13 +30,17 @@ class _NominationTabState extends State<NominationTab> {
   Future<void> _fetchNominationStatus() async {
     try {
       final doc = await FirebaseFirestore.instance
-          .collection('nominations').doc('list').collection(widget.subCollectionId)
+          .collection('nominations')
+          .doc('list')
+          .collection(widget.subCollectionId)
           .doc(widget.aadhaarNumber)
           .get();
 
       if (!doc.exists) {
         setState(() {
           _statusMessage = "No nomination found.";
+          _statusColor = Colors.orange;
+          _statusIcon = Icons.info_outline;
         });
         return;
       }
@@ -46,25 +52,35 @@ class _NominationTabState extends State<NominationTab> {
 
       if (rejectionReason != null && rejectionReason.isNotEmpty) {
         setState(() {
-          _statusMessage = "Your nomination was rejected.";
+          _statusMessage = "❌ Your nomination was rejected.";
           _rejectionReason = rejectionReason;
+          _statusColor = Colors.red.shade600;
+          _statusIcon = Icons.cancel;
         });
       } else if (ecHeadStatus == 'approved') {
         setState(() {
-          _statusMessage = "Your nomination is approved by EC Head.";
+          _statusMessage = "✅ Approved by EC Head.";
+          _statusColor = Colors.green;
+          _statusIcon = Icons.verified;
         });
       } else if (deputyStatus == 'approved') {
         setState(() {
-          _statusMessage = "EC Deputy Head approved your nomination.";
+          _statusMessage = "✅ Approved by EC Deputy Head.";
+          _statusColor = Colors.blue;
+          _statusIcon = Icons.thumb_up_alt_outlined;
         });
       } else {
         setState(() {
-          _statusMessage = "Your nomination has been submitted to EC Deputy Head.";
+          _statusMessage = "⏳ Submitted to EC Deputy Head.";
+          _statusColor = Colors.orangeAccent;
+          _statusIcon = Icons.hourglass_bottom;
         });
       }
     } catch (e) {
       setState(() {
-        _statusMessage = "Error fetching status: $e";
+        _statusMessage = "⚠️ Error: ${e.toString()}";
+        _statusColor = Colors.red;
+        _statusIcon = Icons.error_outline;
       });
     }
   }
@@ -72,26 +88,60 @@ class _NominationTabState extends State<NominationTab> {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.how_to_vote, size: 60, color: Colors.deepPurple),
-            SizedBox(height: 20),
-            Text(
-              _statusMessage,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18),
-            ),
-            if (_rejectionReason != null) ...[
-              SizedBox(height: 10),
-              Text(
-                "Reason: $_rejectionReason",
-                style: TextStyle(color: Colors.red, fontSize: 16),
+      child: Card(
+        elevation: 6,
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 36,
+                backgroundColor: _statusColor.withOpacity(0.1),
+                child: Icon(_statusIcon, size: 40, color: _statusColor),
               ),
+              const SizedBox(height: 20),
+              Text(
+                "Nomination Status",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _statusMessage,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, color: _statusColor),
+              ),
+              if (_rejectionReason != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_outlined, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Reason: $_rejectionReason",
+                          style: const TextStyle(fontSize: 16, color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ]
             ],
-          ],
+          ),
         ),
       ),
     );

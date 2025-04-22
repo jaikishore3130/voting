@@ -142,231 +142,195 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold( appBar: AppBar(
-      title: FutureBuilder<DocumentSnapshot>(
-        future: _fetchCandidateProfile(), // Fetch employee data
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  radius: 20,
-                  child: Icon(
-                    Icons.account_circle,
-                    size: 30,
-                    color: Colors.blueAccent,
-                  ),
-                ),
-                SizedBox(width: 10),
-                Text("Loading...", style: TextStyle(fontSize: 20)),
-              ],
-            );
-          } else if (snapshot.hasError) {
-            return Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  radius: 20,
-                  child: Icon(
-                    Icons.account_circle,
-                    size: 30,
-                    color: Colors.blueAccent,
-                  ),
-                ),
-                SizedBox(width: 10),
-                Text("Error loading data", style: TextStyle(fontSize: 20)),
-              ],
-            );
-          } else if (snapshot.hasData) {
-            var employeeData = snapshot.data?.data() as Map<String, dynamic>;
-            String employeeName = employeeData['name'] ?? "Unknown";
-            String employeeROLE = employeeData['role'] ?? "Unknown";
-            String employeeSTATE = employeeData['state'] ?? "Unknown";
-            employeeROLE=employeeROLE.replaceAll('_', ' ') ;
-            return Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  radius: 20,
-                  child: Icon(
-                    Icons.person,
-                    size: 30,
-                    color: Colors.blueAccent,
-                  ),
-                ),
-                SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Welcome $employeeName",
-                        style: TextStyle(fontSize: 20)),
-                    Text(
-                      "$employeeROLE - $employeeSTATE",
-                      style: TextStyle(fontSize: 14, color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          } else {
-            return Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  radius: 20,
-                  child: Icon(
-                    Icons.account_circle,
-                    size: 30,
-                    color: Colors.blueAccent,
-                  ),
-                ),
-                SizedBox(width: 10),
-                Text("No Data Found", style: TextStyle(fontSize: 20)),
-              ],
-            );
-          }
-        },
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: FutureBuilder<DocumentSnapshot>(
+          future: _fetchCandidateProfile(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _buildAppBarProfile("Loading...", isTablet);
+            } else if (snapshot.hasError) {
+              return _buildAppBarProfile("Error loading data", isTablet);
+            } else if (snapshot.hasData) {
+              var data = snapshot.data?.data() as Map<String, dynamic>;
+              String name = data['name'] ?? "Unknown";
+              String role = (data['role'] ?? "Unknown").replaceAll('_', ' ');
+              String state = data['state'] ?? "Unknown";
+              return _buildAppBarProfile("Welcome $name\n$role - $state", isTablet);
+            } else {
+              return _buildAppBarProfile("No Data Found", isTablet);
+            }
+          },
+        ),
+        backgroundColor: Colors.blueAccent,
+        elevation: 0,
       ),
-      backgroundColor: Colors.blueAccent,
-      elevation: 0,
-    ),
-      backgroundColor: Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFF5F7FA),
       body: FutureBuilder<DocumentSnapshot>(
         future: _fetchCandidateProfile(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || !snapshot.data!.exists) {
-            return Center(child: Text('Candidate not found.'));
-          } else {
-            var data = snapshot.data!.data() as Map<String, dynamic>;
-            String name = data['name'] ?? 'N/A';
-            String age = data['age']?.toString() ?? 'N/A';
-            String phone = data['phone']?.toString() ?? 'N/A';
-            String email = data['email'] ?? 'N/A';
-            String role = data['role'] ?? 'N/A';
-            String state = data['state'] ?? 'N/A';
-            String? profileImageUrl = data['profileImageUrl'];
+            return const Center(child: Text('Candidate not found.'));
+          }
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 50),
-                  Center(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
-                      ),
-                      child: CircleAvatar(
-                        radius: 75,
-                        backgroundImage: (profileImageUrl != null && profileImageUrl.isNotEmpty)
-                            ? NetworkImage(profileImageUrl)
-                            : null,
-                        backgroundColor: Colors.grey.shade300,
-                        child: (profileImageUrl == null || profileImageUrl.isEmpty)
-                            ? Icon(Icons.person, size: 75, color: Colors.white)
-                            : null,
-                      ),
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          final profileImageUrl = data['profileImageUrl'] as String?;
+          final name = data['name'] ?? 'N/A';
+          final age = data['age']?.toString() ?? 'N/A';
+          final phone = data['phone']?.toString() ?? 'N/A';
+          final email = data['email'] ?? 'N/A';
+          final role = data['role'] ?? 'N/A';
+          final state = data['state'] ?? 'N/A';
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 30),
+                Center(
+                  child: CircleAvatar(
+                    radius: isTablet ? 90 : 75,
+                    backgroundImage: profileImageUrl?.isNotEmpty == true
+                        ? NetworkImage(profileImageUrl!)
+                        : null,
+                    backgroundColor: Colors.grey.shade300,
+                    child: (profileImageUrl == null || profileImageUrl.isEmpty)
+                        ? Icon(Icons.person, size: isTablet ? 90 : 75, color: Colors.white)
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Center(
+                  child: Text(
+                    "Welcome to the EC Dashboard",
+                    style: TextStyle(
+                      fontSize: isTablet ? 28 : 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 4,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      children: [
+                        ProfileDetailRow(label: "Name", value: name),
+                        ProfileDetailRow(label: "Age", value: age),
+                        ProfileDetailRow(label: "Phone", value: phone),
+                        ProfileDetailRow(label: "Email", value: email),
+                        ProfileDetailRow(label: "Role", value: role),
+                        ProfileDetailRow(label: "State", value: state),],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Center(
-                    child: Text(
-                      "Welcome to the EC Dashboard",
-                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black87),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 4,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        children: [
-                          ProfileDetailRow(label: "Name", value: name),
-                          ProfileDetailRow(label: "Age", value: age),
-                          ProfileDetailRow(label: "Phone", value: phone),
-                          ProfileDetailRow(label: "Email", value: email),
-                          ProfileDetailRow(label: "Role", value: role),
-                          ProfileDetailRow(label: "State", value: state),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  Text(
-                    "Latest Political News",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  if (_newsArticles.isEmpty)
-                    Center(child: CircularProgressIndicator())
-                  else
-                    SizedBox(
-                      height: 220,
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount: _newsArticles.length,
-                        itemBuilder: (context, index) {
-                          final article = _newsArticles[index];
-                          return GestureDetector(
-                            onTap: () => _showNewsPopup(context, article),
-                            child: Container(
-                              margin: EdgeInsets.only(right: 10),
-                              child: Card(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                elevation: 3,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                                      child: article.imageUrl.isNotEmpty
-                                          ? Image.network(article.imageUrl,
-                                          height: 120, width: double.infinity, fit: BoxFit.cover)
-                                          : Container(
-                                        height: 120,
+                ),
+                const SizedBox(height: 30),
+                Text(
+                  "Latest Political News",
+                  style: TextStyle(fontSize: isTablet ? 24 : 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                if (_newsArticles.isEmpty)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  SizedBox(
+                    height: isTablet ? 250 : 220,
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: _newsArticles.length,
+                      itemBuilder: (context, index) {
+                        final article = _newsArticles[index];
+                        return GestureDetector(
+                          onTap: () => _showNewsPopup(context, article),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 10),
+                            child: Card(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                    child: article.imageUrl.isNotEmpty
+                                        ? Image.network(article.imageUrl,
+                                        height: isTablet ? 140 : 120,
                                         width: double.infinity,
-                                        color: Colors.grey[300],
-                                        child: Icon(Icons.image, size: 50),
+                                        fit: BoxFit.cover)
+                                        : Container(
+                                      height: 120,
+                                      color: Colors.grey[300],
+                                      child: const Icon(Icons.image, size: 50),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(10.0),
+                                    child: Text(
+                                      article.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: isTablet ? 18 : 16,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(10.0),
-                                      child: Text(
-                                        article.title,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style:
-                                        TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
                     ),
-                ],
-              ),
-            );
-          }
+                  ),
+              ],
+            ),
+          );
         },
       ),
     );
   }
+  Widget _buildAppBarProfile(String text, bool isTablet) {
+    final parts = text.split("\n");
+    return Row(
+      children: [
+        const CircleAvatar(
+          backgroundColor: Colors.white,
+          radius: 20,
+          child: Icon(Icons.person, size: 30, color: Colors.blueAccent),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: parts.map((line) {
+              return Text(
+                line,
+                style: TextStyle(fontSize: isTablet ? 18 : 16),
+                overflow: TextOverflow.ellipsis,
+              );
+            }).toList(),
+          ),
+        )
+      ],
+    );
+  }
+
 }
+
 
 class ProfileDetailRow extends StatelessWidget {
   final String label;
