@@ -334,7 +334,7 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
                     if (proceed == true) {
                       final loginSuccess = await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) =>  BiometricAuthScreen()),
+                        MaterialPageRoute(builder: (_) =>  ReLoginWithOtpScreen(userType: 'voting',)),
                       );
 
                       if (loginSuccess == true) {

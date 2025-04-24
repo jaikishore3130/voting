@@ -35,9 +35,9 @@ class _ReLoginWithOtpScreenState extends State<ReLoginWithOtpScreen> {
     super.initState();
     _generateCaptcha();
     twilioFlutter = TwilioFlutter(
-      accountSid: 'ACdc1f549d4efbe1b9ce5827e5ac3994da',
-      authToken: 'd43412cb4ff5d3cb16c358d7bd899fb3',
-      twilioNumber: '+13203825474',
+      accountSid: 'AC7a9a7d0887c92009d5ab6040127c48db',
+      authToken: 'ee460634ec3acaeec62fd70d9851109e',
+      twilioNumber: '+17163215538',
     );
   }
 
