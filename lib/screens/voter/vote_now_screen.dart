@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:voting/screens/voter_login_screen.dart';
+import 'package:voting/screens/relogin_screen.dart';
 import 'package:voting/screens/voting_screen.dart';
 import 'package:voting/services/biometric_service.dart';
+import 'package:voting/screens/VotingInstructionsDialog.dart';
 
 class VoteNowScreen extends StatefulWidget {
-  const VoteNowScreen({Key? key}) : super(key: key);
+  final String aadhaar;
+  const VoteNowScreen({required this.aadhaar});
 
   @override
   _VoteNowScreenState createState() => _VoteNowScreenState();
@@ -145,51 +147,70 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VotingScreen(election: election),
+        builder: (context) => VotingScreen(election: election,aadhaar: widget.aadhaar,),
       ),
     );
   }
-  Future<List<Map<String, dynamic>>> _fetchAllCandidates(String subColId) async {
+  Future<List<Map<String, dynamic>>> _fetchAllCandidates(String subCollectionId) async {
     try {
-      final electionStatusRef = FirebaseFirestore.instance
+      final String electionType = subCollectionId.split("_").first;
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+      // Reference to the election status collection
+      final CollectionReference electionCollectionRef = firestore
           .collection('election_status')
-          .doc('lok_sabha');
+          .doc(electionType)
+          .collection(subCollectionId)
+      .doc('party').collection('list');
 
-      // Step 1: Fetch party list under the given election
-      final partyListDoc = await electionStatusRef
-          .collection(subColId)
-          .doc('party')
-          .collection('list')
-          .get();
+      // Fetch the list of all parties
+      final QuerySnapshot partyListSnapshot = await electionCollectionRef.get();
 
+      // Log the path being queried
+      print("🧭 Querying path: ${electionCollectionRef.path}");
+
+      // Ensure the party list exists
+      if (partyListSnapshot.docs.isEmpty) {
+        print("🚫 No parties found in the list for subCollectionId: $subCollectionId");
+        return [];
+      }
+
+      print("✅ Found ${partyListSnapshot.docs.length} parties in subCollectionId: $subCollectionId");
+
+      // List to store all the candidates
       List<Map<String, dynamic>> allCandidates = [];
 
-      for (final partyDoc in partyListDoc.docs) {
-        final partyId = partyDoc.id;
-        final candidatesSnapshot = await electionStatusRef
-            .collection(subColId)
-            .doc('party')
-            .collection('list')
-            .doc(partyId)
-            .collection('candidates')
-            .get();
+      // Loop through each party
+      for (final partyDoc in partyListSnapshot.docs) {
+        final String partyName = partyDoc.id;
 
+        // Reference to the candidates collection under each party
+        final CollectionReference candidatesCollectionRef = partyDoc.reference.collection('candidates');
+
+        // Fetch all candidates for the party
+        final QuerySnapshot candidatesSnapshot = await candidatesCollectionRef.get();
+
+        // Log the candidates collection path being queried
+        print("🧭 Querying candidates path: ${candidatesCollectionRef.path}");
+
+        // Loop through each candidate and add to the list
         for (final candidateDoc in candidatesSnapshot.docs) {
-          print("$candidateDoc");
-          final candidateData = candidateDoc.data();
-          candidateData['party'] = partyId;
+          final candidateData = candidateDoc.data() as Map<String, dynamic>;
+          candidateData['party'] = partyName;  // Add party name to candidate data
+          candidateData['aadhaar'] = candidateDoc.id;  // Use candidate's ID as Aadhaar
           allCandidates.add(candidateData);
         }
       }
 
-      print("✅ All Candidates Fetched: $allCandidates");
+      print("✅ Total Candidates Fetched: ${allCandidates.length}");
       return allCandidates;
 
     } catch (e) {
-      print("🔥 Firestore fetch error: $e");
+      print("❌ Error fetching candidates: $e");
       return [];
     }
   }
+
   void _showCandidates(Map<String, dynamic> election) async {
     final subColId = election['election_id'] ?? 'lok_sabha_04-22-2025_11-10-56';
     print('🧭 Using SubCollection ID: $subColId');
@@ -272,80 +293,112 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.all(20),
+        backgroundColor: Colors.blue.shade100,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      election['election_type'] ?? 'Election',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                election['election_type'] ?? 'Election',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (isOngoing) ...[
-              ElevatedButton(
-                onPressed: () async {
-                  final loginSuccess = await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) =>  VoterLoginScreen()),
-                  );
-
-                  if (loginSuccess == true) {
-                    final biometricSuccess = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const BiometricAuthScreen()),
+              const SizedBox(height: 20),
+              if (isOngoing)
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF073C6A),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final proceed = await showDialog(
+                      context: context,
+                      builder: (context) => const VotingInstructionsDialog(),
                     );
 
-                    if (biometricSuccess == true) {
-                      Navigator.push(
+                    if (proceed == true) {
+                      final loginSuccess = await Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => VotingScreen(election: election['election_type']),
-                        ),
+                        MaterialPageRoute(builder: (_) =>  BiometricAuthScreen()),
                       );
+
+                      if (loginSuccess == true) {
+                        final biometricSuccess = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => BiometricAuthScreen()),
+                        );
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => VotingScreen(election: election, aadhaar: widget.aadhaar), // Pass the entire map
+                          ),
+                        );
+
+                      }
                     }
-                  }
+                  },
+                  child: const Text(
+                    'Vote Now',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  foregroundColor: const Color(0xFF073C6A), // splash/hover
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showCandidates(election);
                 },
-                child: const Text('Vote Now'),
+                child: const Text(
+                  'Show Candidates',
+                  style: TextStyle(
+                    color: Color(0xFF073C6A),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
 
             ],
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _showCandidates(election);
-              },
-              child: const Text('Show Candidates'),
-            ),
-            const SizedBox(height: 10),
-          ],
+          ),
         ),
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vote Now'),
-        bottom: TabBar(
+      appBar: TabBar(
           controller: _tabController,
           tabs: const [
             Tab(text: 'Ongoing'),
             Tab(text: 'Upcoming'),
           ],
         ),
-      ),
+
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -368,3 +421,4 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
     );
   }
 }
+

@@ -37,27 +37,117 @@ class _ResetPasswordRequestScreenState extends State<ResetPasswordRequestScreen>
   void _showMessage(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
+  Future<Map<String, dynamic>?> fetchCandidateData(String aadhaar) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
 
-  Future<String?> fetchPhone(String aadhaar) async {
-    if (widget.userType == 'candidate') {
-      final partySnapshots = await FirebaseFirestore.instance.collection('LOK_SABHA').get();
-      for (final party in partySnapshots.docs) {
-        final doc = await FirebaseFirestore.instance
-            .collection('LOK_SABHA')
-            .doc(party.id)
+      final electionStatusRef = firestore
+          .collection('election_status')
+          .doc('lok_sabha');
+
+      // Step 1: Fetch all sub-collection IDs from central election control
+      final centralDoc = await firestore
+          .collection('election_control')
+          .doc('central_election_info')
+          .get();
+
+      final subCollectionIds = List<String>.from(
+        centralDoc.data()?['sub_collection_ids'] ?? [],
+      );
+
+      String latestElectionId = '';
+      DateTime latestDate = DateTime(1900);
+
+      // Step 2: Identify the latest completed election
+      for (final subColId in subCollectionIds) {
+        try {
+          final infoDoc = await electionStatusRef
+              .collection(subColId)
+              .doc('election_info')
+              .get();
+
+          final data = infoDoc.data();
+          if (data == null || data['status'] != 'completed') continue;
+
+          final datePart = subColId.split('_')[2]; // e.g., "04-22-2025"
+          final dateOnly = datePart.split('_')[0]; // Strip time if present
+          final parts = dateOnly.split('-'); // MM-DD-YYYY
+          final parsedDate = DateTime.parse('${parts[2]}-${parts[0]}-${parts[1]}');
+
+          if (parsedDate.isAfter(latestDate)) {
+            latestDate = parsedDate;
+            latestElectionId = subColId;
+          }
+        } catch (e) {
+          print('⚠️ Failed reading $subColId: $e');
+        }
+      }
+
+      if (latestElectionId.isEmpty) {
+        print('❌ No completed elections found');
+        return null;
+      }
+
+      print('🗳️ Latest Completed Election ID: $latestElectionId');
+
+      // Step 3: Fetch all parties under the latest election
+      final partyDocs = await electionStatusRef
+          .collection(latestElectionId)
+          .doc('party')
+          .collection('list')
+          .get();
+
+      if (partyDocs.docs.isEmpty) {
+        print('🚫 No parties found in $latestElectionId');
+        return null;
+      }
+
+      for (final party in partyDocs.docs) {
+        final partyId = party.id;
+        print('🏛️ Checking Party: $partyId');
+
+        final candidateDoc = await electionStatusRef
+            .collection(latestElectionId)
+            .doc('party')
+            .collection('list')
+            .doc(partyId)
             .collection('candidates')
             .doc(aadhaar)
             .get();
-        if (doc.exists) {
-          final data = doc.data();
-          return data?['phone'] != null ? "+91${data?['phone']}" : null;
+
+        if (candidateDoc.exists) {
+          final data = candidateDoc.data();
+          data?['party'] = partyId;
+          print('🎯 Candidate found in $partyId: $data');
+          return data;
         }
       }
+
+      print('❌ Candidate with Aadhaar $aadhaar not found in any party');
+      return null;
+    } catch (e) {
+      print('🔥 Firestore fetch error: $e');
+      return null;
+    }
+  }
+
+
+  Future<String?> fetchPhone(String aadhaar) async {
+    if (widget.userType == 'candidate') {
+      final data = await fetchCandidateData(aadhaar);
+
+      if (data != null && data['phone_number'] != null) {
+        return "+91${data['phone_number']}";
+      }
     } else if (widget.userType == 'ec') {
-      final doc = await FirebaseFirestore.instance.collection('EC_EMPLOYEES').doc(aadhaar).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('EC_EMPLOYEES')
+          .doc(aadhaar)
+          .get();
+
       if (doc.exists) {
         final data = doc.data();
-        return data?['phone'] != null ? "+91${data?['phone']}" : null;
+        return data?['phone_number'] != null ? "+91${data?['phone_number']}" : null;
       }
     }
     return null;

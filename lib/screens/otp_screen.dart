@@ -10,6 +10,8 @@ import 'package:voting/screens/voter/voter_dashboard.dart';
 import 'candidate_dashboard.dart';
 import 'ec_dashboard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:voting/screens/voter/vote_now_screen.dart';
+import 'package:voting/config/routes.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -58,9 +60,9 @@ class _OtpScreenState extends State<OtpScreen> {
   void initState() {
     super.initState();
     twilioFlutter = TwilioFlutter(
-      accountSid: 'ACf0dd706f7c2cdc8d6e360de8eb887a95',
-      authToken: '9d32a07fa0ce9bf72f1ee53dba04afab',
-      twilioNumber: '+12189554622',
+      accountSid: 'ACdc1f549d4efbe1b9ce5827e5ac3994da',
+      authToken: 'd43412cb4ff5d3cb16c358d7bd899fb3',
+      twilioNumber: '+13203825474',
 
     );
     _generateNewOtp();
@@ -111,7 +113,7 @@ class _OtpScreenState extends State<OtpScreen> {
     if (enteredOtp == generatedOtp) {
       if (widget.userType == "nomination") {
         Navigator.pop(context, true); // return to nomination screen stepper
-      } else {
+      }else {
         _navigateToDashboard();
       }
     } else {

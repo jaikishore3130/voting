@@ -79,7 +79,7 @@ class AuthenticationScreen extends StatelessWidget {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => VoterLoginScreen()),
+                            MaterialPageRoute(builder: (context) => VoterLoginScreen(userType:'voter')),
                           );
                         },
                       ),

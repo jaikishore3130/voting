@@ -265,7 +265,7 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
                   keyboardType: TextInputType.number,
                   icon: Icons.credit_card),
               const SizedBox(height: 10),
-              buildStyledTextField("Password", passwordController,
+              buildStyledTextField("password", passwordController,
                   obscureText: true, icon: Icons.lock),
               const SizedBox(height: 10),
               buildCaptchaRow(),

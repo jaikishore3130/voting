@@ -30,6 +30,7 @@ class _NominationScreenState extends State<NominationScreen> {
   File? _video;
   String? photoUrl;
   String? videoUrl;
+  String? _selectedConstituency;
 
   final _nameController = TextEditingController();
   final _fatherNameController = TextEditingController();
@@ -46,13 +47,72 @@ class _NominationScreenState extends State<NominationScreen> {
   String? _selectedState;
   String? _selectedParty;
 
-  final List<String> states = [
-    'Bihar',
-    'Maharashtra',
-    'Tamil Nadu',
-    'Karnataka'
+  final Map<String, List<String>> stateConstituencies = {'Telangana': ['ADILABAD', 'BHONGIR', 'CHEVELLA', 'HYDERABAD', 'KARIMNAGAR', 'KHAMMAM', 'MAHABUBABAD',
+    'MAHBUBNAGAR', 'MALKAJGIRI', 'MEDAK', 'NAGARKURNOOL', 'NALGONDA', 'NIZAMABAD', 'PEDDAPALLE', 'SECUNDRABAD', 'WARANGAL', 'ZAHIRABAD'],'Uttar Pradesh':
+  ['AGRA', 'AKBARPUR', 'ALIGARH', 'ALLAHABAD', 'AMBEDKAR NAGAR', 'AMETHI', 'AMROHA', 'AONLA', 'AZAMGARH', 'BADAUN', 'BAGHPAT', 'BAHRAICH', 'BALLIA', 'BANDA',
+    'BANSGAON', 'BARABANKI', 'BAREILLY', 'BASTI', 'BHADOHI', 'BIJNOR', 'BULANDSHAHR', 'CHANDAULI', 'DEORIA', 'DHAURAHRA', 'DOMARIYAGANJ', 'ETAH', 'ETAWAH',
+    'FAIZABAD', 'FARRUKHABAD', 'FATEHPUR', 'FATEHPUR SIKRI', 'FIROZABAD', 'GAUTAM BUDDHA NAGAR', 'GHAZIABAD', 'GHAZIPUR', 'GHOSI', 'GONDA', 'GORAKHPUR', 'HAMIRPUR',
+    'HARDOI', 'HATHRAS', 'JALAUN', 'JAUNPUR', 'JHANSI', 'KAIRANA', 'KAISERGANJ', 'KANNAUJ', 'KANPUR', 'KAUSHAMBI', 'KHERI', 'KUSHI NAGAR', 'LALGANJ', 'LUCKNOW',
+    'MACHHLISHAHR', 'MAHARAJGANJ', 'MAINPURI', 'MATHURA', 'MEERUT', 'MIRZAPUR', 'MISRIKH', 'MOHANLALGANJ', 'MORADABAD', 'MUZAFFARNAGAR', 'NAGINA', 'PHULPUR',
+    'PILIBHIT', 'PRATAPGARH', 'RAE BARELI', 'RAMPUR', 'ROBERTSGANJ', 'SAHARANPUR', 'SALEMPUR', 'SAMBHAL', 'SANT KABIR NAGAR', 'SHAHJAHANPUR', 'SHRAWASTI', 'SITAPUR',
+    'SULTANPUR', 'UNNAO', 'VARANASI'],'Maharashtra': ['AHMADNAGAR', 'AKOLA', 'AMRAVATI', 'AURANGABAD', 'BARAMATI', 'BEED', 'BHANDARA - GONDIYA', 'BHIWANDI', 'BULDHANA',
+    'CHANDRAPUR', 'DHULE', 'DINDORI', 'GADCHIROLI-CHIMUR', 'HATKANANGLE', 'HINGOLI', 'JALGAON', 'JALNA', 'KALYAN', 'KOLHAPUR', 'LATUR', 'MADHA', 'MAVAL', 'MUMBAI NORTH',
+    'MUMBAI NORTH CENTRAL', 'MUMBAI NORTH EAST', 'MUMBAI NORTH WEST', 'MUMBAI SOUTH', 'MUMBAI SOUTH CENTRAL', 'NAGPUR', 'NANDED', 'NANDURBAR', 'NASHIK', 'OSMANABAD',
+    'PALGHAR', 'PARBHANI', 'PUNE', 'RAIGAD', 'RAMTEK', 'RATNAGIRI - SINDHUDURG', 'RAVER', 'SANGLI', 'SATARA', 'SHIRDI', 'SHIRUR', 'SOLAPUR', 'THANE', 'WARDHA', 'YAVATMAL-WASHIM']
+    ,'Gujarat': ['AHMEDABAD EAST', 'AHMEDABAD WEST', 'AMRELI', 'ANAND', 'BANASKANTHA', 'BARDOLI', 'BHARUCH', 'BHAVNAGAR', 'CHHOTA UDAIPUR', 'DAHOD', 'GANDHINAGAR', 'JAMNAGAR',
+      'JUNAGADH', 'KACHCHH', 'KHEDA', 'MAHESANA', 'NAVSARI', 'PANCHMAHAL', 'PATAN', 'PORBANDAR', 'RAJKOT', 'SABARKANTHA', 'SURAT', 'SURENDRANAGAR', 'VADODARA', 'VALSAD']
+    ,'Rajasthan': ['AJMER', 'ALWAR', 'BANSWARA', 'BARMER', 'BHARATPUR', 'BHILWARA', 'BIKANER (SC)', 'CHITTORGARH', 'CHURU', 'DAUSA', 'GANGANAGAR', 'JAIPUR', 'JAIPUR RURAL',
+      'JALORE', 'JHALAWAR-BARAN', 'JHUNJHUNU', 'JODHPUR', 'KARAULI-DHOLPUR', 'KOTA', 'NAGAUR', 'PALI', 'RAJSAMAND', 'SIKAR', 'TONK-SAWAI MADHOPUR', 'UDAIPUR']
+    ,'Kerala': ['ALAPPUZHA', 'ALATHUR', 'ATTINGAL', 'CHALAKUDY', 'ERNAKULAM', 'IDUKKI', 'KANNUR', 'KASARAGOD', 'KOLLAM', 'KOTTAYAM', 'KOZHIKODE', 'MALAPPURAM',
+      'MAVELIKKARA', 'PALAKKAD', 'PATHANAMTHITTA', 'PONNANI', 'THIRUVANANTHAPURAM', 'THRISSUR', 'VADAKARA', 'WAYANAD'],'West Bengal': ['ALIPURDUARS', 'ARAMBAGH', 'ASANSOL', 'BAHARAMPUR',
+      'BALURGHAT', 'BANGAON', 'BANKURA', 'BARASAT', 'BARDHAMAN DURGAPUR', 'BARDHAMAN PURBA', 'BARRACKPORE', 'BASIRHAT', 'BIRBHUM', 'BISHNUPUR', 'BOLPUR', 'COOCH BEHAR', 'DARJEELING',
+      'DIAMOND HARBOUR', 'DUM DUM', 'GHATAL', 'HOOGHLY', 'HOWRAH', 'JADAVPUR', 'JALPAIGURI', 'JANGIPUR', 'JAYNAGAR',
+      'JHARGRAM', 'KANTHI', 'KOLKATA DAKSHIN', 'KOLKATA UTTAR', 'KRISHNANAGAR', 'MALDAHA DAKSHIN', 'MALDAHA UTTAR', 'MATHURAPUR', 'MEDINIPUR', 'MURSHIDABAD', 'PURULIA', 'RAIGANJ', 'RANAGHAT', 'SRERAMPUR', 'TAMLUK', 'ULUBERIA']
+    ,'Uttarakhand': ['ALMORA', 'GARHWAL', 'HARDWAR', 'NAINITAL-UDHAMSINGH NAGAR', 'TEHRI GARHWAL']
+    ,'Andhra Pradesh': ['AMALAPURAM', 'ANAKAPALLI', 'ANANTAPUR', 'ARUKU', 'BAPATLA', 'CHITTOOR', 'ELURU', 'GUNTUR', 'HINDUPUR', 'KADAPA', 'KAKINADA', 'KURNOOL', 'MACHILIPATNAM',
+      'NANDYAL', 'NARASARAOPET', 'NARSAPURAM', 'NELLORE', 'ONGOLE', 'RAJAHMUNDRY', 'RAJAMPET', 'SRIKAKULAM', 'TIRUPATI', 'VIJAYAWADA', 'VISAKHAPATNAM', 'VIZIANAGARAM']
+    ,'Haryana': ['AMBALA', 'BHIWANI-MAHENDRAGARH', 'FARIDABAD', 'GURGAON', 'HISAR', 'KARNAL', 'KURUKSHETRA', 'ROHTAK', 'SIRSA', 'SONIPAT']
+    ,'Punjab': ['AMRITSAR', 'ANANDPUR SAHIB', 'BATHINDA', 'FARIDKOT', 'FATEHGARH SAHIB', 'FIROZPUR', 'GURDASPUR', 'HOSHIARPUR', 'JALANDHAR', 'KHADOOR SAHIB', 'LUDHIANA', 'PATIALA', 'SANGRUR']
+    ,'Jammu & Kashmir': ['ANANTNAG', 'BARAMULLA', 'JAMMU', 'LADAKH', 'SRINAGAR', 'UDHAMPUR']
+    ,'Andaman & Nicobar Islands': ['ANDAMAN & NICOBAR ISLANDS']
+    ,'Tamil Nadu': ['ARAKKONAM', 'ARANI', 'CHENNAI CENTRAL', 'CHENNAI NORTH', 'CHENNAI SOUTH', 'CHIDAMBARAM', 'COIMBATORE', 'CUDDALORE', 'DHARMAPURI', 'DINDIGUL', 'ERODE',
+      'KALLAKURICHI', 'KANCHEEPURAM', 'KANNIYAKUMARI', 'KARUR', 'KRISHNAGIRI', 'MADURAI', 'MAYILADUTHURAI', 'NAGAPATTINAM', 'NAMAKKAL', 'NILGIRIS', 'PERAMBALUR', 'POLLACHI',
+      'RAMANATHAPURAM', 'SALEM', 'SIVAGANGA', 'SRIPERUMBUDUR', 'TENKASI', 'THANJAVUR', 'THENI', 'THIRUVALLUR', 'THOOTHUKKUDI', 'TIRUCHIRAPPALLI', 'TIRUNELVELI', 'TIRUPPUR', 'TIRUVANNAMALAI', 'VILUPPURAM', 'VIRUDHUNAGAR']
+    ,'Bihar': ['ARARIA', 'ARRAH', 'AURANGABAD', 'BANKA', 'BEGUSARAI', 'BHAGALPUR', 'BUXAR', 'DARBHANGA', 'GAYA (SC)', 'GOPALGANJ (SC)', 'HAJIPUR (SC)', 'JAHANABAD', 'JAMUI (SC)', 'JHANJHARPUR', 'KARAKAT', 'KATIHAR', 'KHAGARIA', 'KISHANGANJ', 'MADHEPURA', 'MADHUBANI', 'MAHARAJGANJ', 'MUNGER', 'MUZAFFARPUR', 'NALANDA', 'NAWADA', 'PASCHIM CHAMPARAN', 'PATALIPUTRA', 'PATNA SAHIB', 'PURNIA', 'PURVI CHAMPARAN', 'SAMASTIPUR (SC)', 'SARAN', 'SASARAM (SC)', 'SHEOHAR', 'SITAMARHI', 'SIWAN', 'SUPAUL', 'UJIARPUR', 'VAISHALI', 'VALMIKI NAGAR']
+    ,'Arunachal Pradesh': ['ARUNACHAL EAST', 'ARUNACHAL WEST']
+    ,'Odisha': ['ASKA', 'BALASORE', 'BARGARH', 'BERHAMPUR', 'BHADRAK', 'BHUBANESWAR', 'BOLANGIR', 'CUTTACK', 'DHENKANAL', 'JAGATSINGHPUR', 'JAJPUR', 'KALAHANDI', 'KANDHAMAL', 'KENDRAPARA', 'KEONJHAR', 'KORAPUT', 'MAYURBHANJ', 'NABARANGPUR', 'PURI', 'SAMBALPUR', 'SUNDARGARH']
+    ,'Assam': ['AUTONOMOUS DISTRICT', 'BARPETA', 'DHUBRI', 'DIBRUGARH', 'GAUHATI', 'JORHAT', 'KALIABOR', 'KARIMGANJ', 'KOKRAJHAR', 'LAKHIMPUR', 'MANGALDOI', 'NOWGONG', 'SILCHAR', 'TEZPUR']
+    ,'Karnataka': ['BAGALKOT', 'BANGALORE CENTRAL', 'BANGALORE NORTH', 'BANGALORE RURAL', 'BANGALORE SOUTH', 'BELGAUM', 'BELLARY', 'BIDAR', 'BIJAPUR', 'CHAMARAJANAGAR', 'CHIKKBALLAPUR', 'CHIKKODI', 'CHITRADURGA', 'DAKSHINA KANNADA', 'DAVANAGERE', 'DHARWAD', 'GULBARGA', 'HASSAN', 'HAVERI', 'KOLAR', 'KOPPAL', 'MANDYA', 'MYSORE', 'RAICHUR', 'SHIMOGA', 'TUMKUR', 'UDUPI CHIKMAGALUR', 'UTTARA KANNADA']
+    ,'Madhya Pradesh': ['BALAGHAT', 'BETUL', 'BHIND', 'BHOPAL', 'CHHINDWARA', 'DAMOH', 'DEWAS', 'DHAR', 'GUNA', 'GWALIOR', 'HOSHANGABAD', 'INDORE', 'JABALPUR', 'KHAJURAHO', 'KHANDWA', 'KHARGONE', 'MANDLA', 'MANDSOUR', 'MORENA', 'RAJGARH', 'RATLAM', 'REWA', 'SAGAR', 'SATNA', 'SHAHDOL', 'SIDHI', 'TIKAMGARH', 'UJJAIN', 'VIDISHA']
+    ,'Chhattisgarh': ['BASTAR', 'BILASPUR', 'DURG', 'JANJGIR-CHAMPA', 'KANKER', 'KORBA', 'MAHASAMUND', 'RAIGARH', 'RAIPUR', 'RAJNANDGAON', 'SARGUJA']
+    ,'Chandigarh': ['CHANDIGARH']
+    ,'NCT OF Delhi': ['CHANDNI CHOWK', 'EAST DELHI', 'NEW DELHI', 'NORTH EAST DELHI', 'NORTH WEST DELHI', 'SOUTH DELHI', 'WEST DELHI']
+    ,'Jharkhand': ['CHATRA', 'DHANBAD', 'DUMKA', 'GIRIDIH', 'GODDA', 'HAZARIBAGH', 'JAMSHEDPUR', 'KHUNTI', 'KODARMA', 'LOHARDAGA', 'PALAMAU', 'RAJMAHAL', 'RANCHI', 'SINGHBHUM']
+    ,'Dadra & Nagar Haveli': ['DADRA AND NAGAR HAVELI']
+    ,'Daman & Diu': ['DAMAN & DIU']
+    ,'Himachal Pradesh': ['HAMIRPUR', 'KANGRA', 'MANDI', 'SHIMLA']
+    ,'Manipur': ['INNER MANIPUR', 'OUTER MANIPUR']
+    ,'Lakshadweep': ['LAKSHADWEEP']
+    ,'Mizoram': ['MIZORAM']
+    ,'Nagaland': ['NAGALAND']
+    ,'Goa': ['NORTH GOA', 'SOUTH GOA']
+    ,'Puducherry': ['PUDUCHERRY'],'Meghalaya': ['SHILLONG', 'TURA'],'Sikkim': ['SIKKIM'],'Tripura': ['TRIPURA EAST', 'TRIPURA WEST']};
+
+
+  List<String> get states => stateConstituencies.keys.toList();
+  List<String> getConstituencies(String? state) => stateConstituencies[state] ?? [];
+
+  final List<String> parties =  [
+     'BJP', 'TRS', 'INC', 'BSP', 'NCP', 'VBA', 'APoI', 'CPI(M)', 'BDJS', 'AITC', 'RSP', 'SP', 'YSRCP',
+    'TDP', 'JnP', 'INLD', 'SBSP', 'IND', 'SHS', 'AAP', 'SAD', 'JKN', 'JKPDP','JPC', 'DMK', 'PMK', 'NTK', 'MNM', 'AIADMK', 'RJD',
+    'CPI(ML)(L)', 'SSD', 'PPA', 'JD(S)', 'NPEP', 'BMUP', 'BJD', 'AIMIM', 'HAMS', 'AHFBK', 'PPID', 'SPL', 'ASDC', 'RLD', 'PSPL',
+    'JD(U)', 'BTP', 'AIFB', 'AGP', 'AIUDF', 'ABSKP', 'PUNEKP', 'RTORP', 'JNJP', 'LTSP', 'RVNP', 'JANADIP', 'SDPI', 'DMDK',
+    'ABGP', 'VCK', 'JMM', 'LIP', 'JDR', 'MOSP', 'MADP', 'AJPR', 'PMP', 'BBMP', 'AJSUP', 'JVM', 'RMPOI', 'LJP',
+    'BJKVP', 'SWP', 'NEINDP', 'RSPSR', 'ravp', 'RSOSP', 'BLSP', 'WPOI', 'SUCI(C)', 'SJDD', 'ANC', 'JDL', 'VSIP', 'AAM', 'JKP',
+    'BOPF', 'UPPL', 'CPIM', 'GGP', 'KEC(M)', 'KEC', 'JAPL', 'AKBMP', 'TJS', 'IUML', 'BSCP', 'ADAL', 'BRPI', 'MNF', 'PRISMP',
+    'VPI', 'YKP', 'NDPP', 'RLTP', 'RAHIS', 'NPF', 'BLSD', 'BVA', 'NAWPP', 'AINRC', 'BNDl', 'MSHP', 'BARESP', 'BLRP', 'AIPF',
+    'WAP', 'VCSMP', 'SAD(M)', 'UDP', 'SKM', 'SDF', 'PDP', 'JHP', 'TMC(M)', 'IPFT', 'JKNPP', 'DSSP', 'AHNP', 'PHJSP'
   ];
-  final List<String> parties = ['BJP', 'INC', 'AAP', 'CPI', 'Independent'];
 
   int? _calculatedAge;
   bool _isPhoneVerified = false;
@@ -268,22 +328,47 @@ class _NominationScreenState extends State<NominationScreen> {
           ),
         ),
 
-
         Step(
           title: Text('Location'),
           isActive: _currentStep >= 1,
           content: Column(
             children: [
               _buildTextField(_addressController, 'Postal Address'),
-              _buildDropdown('State', _selectedState, states, (val) =>
-                  setState(() => _selectedState = val)),
-              _buildTextField(_constituencyController, 'Constituency'),
+
+              // State Dropdown
+              _buildDropdown(
+                  'State',
+                  _selectedState,
+                  states,
+                      (val) {
+                    setState(() {
+                      _selectedState = val;
+                      _selectedConstituency = null; // Reset constituency when state changes
+                    });
+                  }
+              ),
+
+              // Constituency Dropdown
+              if (_selectedState != null)
+                _buildDropdown(
+                  'Constituency',
+                  _selectedConstituency,
+                  getConstituencies(_selectedState),
+                      (val) => setState(() => _selectedConstituency = val),
+                ),
+
+
+
+              // Political Party Dropdown
               _buildDropdown(
                   'Political Party', _selectedParty, parties, (val) =>
                   setState(() => _selectedParty = val)),
+
             ],
           ),
         ),
+
+
         Step(
           title: Text('Authentication'),
           isActive: _currentStep >= 2,
@@ -316,7 +401,7 @@ class _NominationScreenState extends State<NominationScreen> {
                 ),
               if (_isPhoneVerified) ...[
                 _buildTextField(
-                    _passwordController, 'Password', isPassword: true),
+                    _passwordController, 'password', isPassword: true),
                 _buildTextField(_confirmPasswordController, 'Confirm Password',
                     isPassword: true),
               ],
@@ -386,16 +471,16 @@ class _NominationScreenState extends State<NominationScreen> {
       'dob': _dobController.text,
       'education': _educationController.text,
       'address': _addressController.text,
-      'phone': _phoneController.text,
+      'phone_number': _phoneController.text,
       'gender': _selectedGender,
       'state': _selectedState,
       'party': _selectedParty,
-      'constituency': _constituencyController.text,
+      'constituency': _selectedConstituency,
       'photo': photoUrl,
       'video': videoUrl,
       'ec_head': false,
       'ec_deputy_head': false,
-      'Password': _passwordController.text
+      'password': _passwordController.text
     });
 
     // Navigate to NominationStatusScreen

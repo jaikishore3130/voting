@@ -30,7 +30,7 @@ class _VoterDashboardState extends State<VoterDashboard> {
   void initState() {
     super.initState();
     _screens = [
-      VoteNowScreen(),
+      VoteNowScreen(aadhaar:widget.aadhaarNumber),
       ResultsScreen(),
       HomeScreen(aadhaarNumber: widget.aadhaarNumber), // ✅ Correct usage
       CandidatesScreen(),

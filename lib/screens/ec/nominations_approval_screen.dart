@@ -93,53 +93,88 @@ class _NominationsApprovalScreenState extends State<NominationsApprovalScreen> {
   }
 
   Future<void> approveNomination(Map<String, dynamic> data) async {
-    final partyName = data['party'];
-    final aadhaar = data['aadhaar'];
-    final subCollectionId = data['subCollectionId']; // 👈 dynamic value
+    try {
+      final String partyName = data['party'];
+      final String aadhaar = data['aadhaar'];
+      final String subCollectionId = data['subCollectionId']; // e.g. "lok_sabha_04-22-2025"
+      final String electionType = subCollectionId.split("_").first;
 
-    final docRefff = FirebaseFirestore.instance
-        .collection('election_status')
-        .doc('lok_sabha')
-        .collection(subCollectionId)
-        .doc('party')
-        .collection('list')
-        .doc(partyName)
-        .collection('candidates')
-        .doc(aadhaar);
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
-    await docRefff.set(data);
+      final DocumentReference candidateRef = firestore
+          .collection('election_status')
+          .doc(electionType)
+          .collection(subCollectionId)
+          .doc('party')
+          .collection('list')
+          .doc(partyName)
+          .collection('candidates')
+          .doc(aadhaar);
 
-      final electionControlRef = FirebaseFirestore.instance.collection('aa').doc('list');
+      // Ensure party metadata exists
+      final DocumentReference partyRef = firestore
+          .collection('election_status')
+          .doc(electionType)
+          .collection(subCollectionId)
+          .doc('party')
+          .collection('list')
+          .doc(partyName);
+
+      final partySnapshot = await partyRef.get();
+      if (!partySnapshot.exists) {
+        await partyRef.set({
+          'leader': data['leader'] ?? 'Unknown',
+          'logoUrl': data['logoUrl'] ?? '',
+          'symbol': data['symbol'] ?? '',
+        });
+      }
+
+      // Add candidate under approved party
+      await candidateRef.set(data);
+      print("✅ Candidate $aadhaar added to party $partyName");
+
+      // Remove nomination from temporary nominations list
+      final DocumentReference nominationRef = firestore
+          .collection('nominations')
+          .doc('list')
+          .collection(subCollectionId)
+          .doc(aadhaar);
+
+      await nominationRef.delete();
+      print("🗑️ Nomination $aadhaar deleted from /nominations");
+
+      // Update local state (UI)
+      setState(() {
+        nominations.removeWhere((candidate) =>
+        candidate['aadhaar'] == aadhaar &&
+            candidate['subCollectionId'] == subCollectionId);
+      });
+
+      // Optional: Update list of allSubCollectionIds (if needed)
+      final DocumentReference electionControlRef =
+      firestore.collection('aa').doc('list');
       final docSnapshot = await electionControlRef.get();
 
       if (docSnapshot.exists) {
-        final data = docSnapshot.data();
-        if (data != null && data.containsKey('sub_collection_ids')) {
+        final docData = docSnapshot.data();
+        if (docData != null && docData is Map<String, dynamic> && docData.containsKey('sub_collection_ids')) {
+          final List<dynamic> ids = docData['sub_collection_ids'];
           setState(() {
-            allSubCollectionIds.addAll(List<String>.from(data[aadhaar]));
+            allSubCollectionIds.addAll(List<String>.from(ids));
           });
-        }
+      }
       }
 
-
-
-    final docRef = FirebaseFirestore.instance
-        .collection('nominations')
-        .doc('list')
-        .collection(subCollectionId)
-        .doc(aadhaar);
-
-    await docRef.delete();
-
-    setState(() {
-      nominations.removeWhere((candidate) =>
-      candidate['aadhaar'] == aadhaar &&
-          candidate['subCollectionId'] == subCollectionId);
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Nomination Approved')),
-    );
+      // Show success
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('✅ Nomination Approved')),
+      );
+    } catch (e) {
+      print("❌ Error approving nomination: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Failed to approve nomination')),
+      );
+    }
   }
 
   Future<void> rejectNomination(Map<String, dynamic> data) async {

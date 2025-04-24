@@ -9,6 +9,8 @@ import 'package:flutter/services.dart';
 
 
 class VoterLoginScreen extends StatefulWidget {
+  final String userType;
+  const VoterLoginScreen({required this.userType});
   @override
   _VoterLoginState createState() => _VoterLoginState();
 }
@@ -117,7 +119,7 @@ class _VoterLoginState extends State<VoterLoginScreen> {
                   phoneNumber: phoneNumber,
                   aadhaarNumber: _aadhaarController.text,
                   // Pass the Aadhaar number
-                  userType: 'voter', // Adjust this based on the user type (voter, candidate, ec_employee)
+                  userType: widget.userType, // Adjust this based on the user type (voter, candidate, ec_employee)
                 ),
           ),
         );
