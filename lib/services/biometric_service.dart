@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:voting/screens/FaceVerificationPage.dart';
 
 class BiometricAuthScreen extends StatefulWidget {
+
+  final String aadhaar;
+  const BiometricAuthScreen({required this.aadhaar});
   @override
   State<BiometricAuthScreen> createState() => _BiometricAuthScreenState();
 }
@@ -170,8 +174,19 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen> {
             // 🔘 Show face button if fingerprint is done but face is not
             if (_fingerprintAuthDone && !_faceAuthDone)
               ElevatedButton(
-                onPressed: _authenticateFace,
-                child: const Text("Authenticate with Face"),
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FaceAuthScreen(aadhaar: widget.aadhaar),
+                    ),
+                  );
+
+                  // Optional: check result from FaceAuthScreen
+
+
+                },
+                child: Text("Proceed to Face Verification"),
               ),
           ],
         ),

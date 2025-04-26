@@ -22,6 +22,7 @@ class _VotingScreenState extends State<VotingScreen> {
   Map<String, dynamic>? selectedCandidate;
   String? selectedElectionId;
   List<Map<String, dynamic>> candidates = [];
+  String? selectedCandidates;
 
   @override
   void initState() {
@@ -289,24 +290,45 @@ class _VotingScreenState extends State<VotingScreen> {
       final encryptedVote = _encryptVote(candidate['aadhaar']);
       final encryptedUser = _encryptUser(widget.aadhaar);
 
-      await voteDocRef.set({
-        'election_id': widget.election["id"],
-        'candidate_id': encryptedVote,
-        'user_id': encryptedUser,
-        'timestamp': FieldValue.serverTimestamp(),
-        'visible': false, // Hide until polling ends
+      // Start a Firestore transaction to handle vote count update
+      await firestore.runTransaction((transaction) async {
+        // Create vote record
+        transaction.set(voteDocRef, {
+          'election_id': widget.election["id"],
+          'candidate_id': encryptedVote,
+          'user_id': encryptedUser,
+          'timestamp': FieldValue.serverTimestamp(),
+          'visible': false, // Hide until polling ends
+        });
+
+        // Get candidate reference
+        final candidateRef = firestore.collection('candidates').doc(candidate['aadhaar']);
+
+        // Get current vote count
+        final candidateSnapshot = await transaction.get(candidateRef);
+
+        if (!candidateSnapshot.exists) {
+          throw Exception("Candidate not found");
+        }
+
+        // Increment vote count using Firestore's atomic operation
+        final currentVoteCount = candidateSnapshot.data()?['vote_count'] ?? 0;
+        transaction.update(candidateRef, {
+          'vote_count': FieldValue.increment(1),
+        });
       });
 
       _showMessage("✅ Vote submitted successfully!");
 
       setState(() {
-        selectedCandidate = null;
+        selectedCandidates = null;
       });
     } catch (e) {
       print("❌ Error submitting vote: $e");
       _showMessage("Something went wrong while submitting your vote.");
     }
   }
+
   String _encryptVote(String vote) {
     // TODO: Replace with AES or another secure encryption
     return "enc_$vote";
@@ -316,12 +338,6 @@ class _VotingScreenState extends State<VotingScreen> {
     // TODO: Replace with secure encryption
     return "user_${userId.hashCode}";
   }
-  final Map<String, dynamic> notaCandidate = {
-    'name': 'NOTA',
-    'party': 'None',
-    'aadhaar': 'NOTA',
-  };
-
 
   Future<void> _showMessage(String msg, {bool popAfter = false}) async {
     await showDialog(
@@ -345,6 +361,17 @@ class _VotingScreenState extends State<VotingScreen> {
       Navigator.of(context).pop(); // Pop VotingScreen itself
     }
   }
+
+
+
+  final Map<String, dynamic> notaCandidate = {
+    'name': 'NOTA',
+    'party': 'None',
+    'aadhaar': 'NOTA',
+  };
+
+
+
 
 
 }
