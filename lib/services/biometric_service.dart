@@ -1,37 +1,42 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:voting/screens/FaceVerificationPage.dart';
 
 class BiometricAuthScreen extends StatefulWidget {
-
   final String aadhaar;
-  const BiometricAuthScreen({required this.aadhaar});
+  final Map<String, dynamic> election;  // Changed static to instance variable
+
+  const BiometricAuthScreen({
+    required this.aadhaar,
+    required this.election,
+  });
+
   @override
   State<BiometricAuthScreen> createState() => _BiometricAuthScreenState();
 }
 
-class _BiometricAuthScreenState extends State<BiometricAuthScreen> {
+
+class _BiometricAuthScreenState extends State<BiometricAuthScreen> with SingleTickerProviderStateMixin {
   final LocalAuthentication auth = LocalAuthentication();
   bool _isProcessing = false;
-  String _status = "Click below to start biometric verification.";
+  String _status = "Click below to start fingerprint verification.";
   bool _fingerprintAuthDone = false;
-  bool _faceAuthDone = false;
 
-  // Authenticate using fingerprint
+  late AnimationController _lottieController;
+  bool _playedInitial = false;
+
   Future<void> _authenticateFingerprint() async {
     try {
       setState(() {
         _isProcessing = true;
-        _status = "Authenticating with fingerprint...";
+        _status = "Authenticating fingerprint...";
       });
 
-      // Start fingerprint authentication
       final authenticated = await auth.authenticate(
         localizedReason: 'Scan your fingerprint to continue',
-        options: const AuthenticationOptions(
-          stickyAuth: true, // Keep the authentication until successful or canceled
-        ),
+        options: const AuthenticationOptions(stickyAuth: true),
       );
 
       if (authenticated) {
@@ -40,10 +45,18 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen> {
           _status = "Fingerprint authentication successful!";
         });
 
-        // If fingerprint is done, check for face authentication
-        if (_faceAuthDone) {
-          Navigator.pop(context, true); // Return true if both are done
-        }
+        // Play full animation after authentication success
+        _lottieController.reset();
+        _lottieController.animateTo(1.0, duration: const Duration(seconds: 2));
+
+        // After animation completes, move to Face Verification
+        await Future.delayed(const Duration(seconds: 2));
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FaceAuthScreen(aadhaar: widget.aadhaar, election:widget.election,),
+          ),
+        );
       } else {
         setState(() {
           _status = "Fingerprint authentication failed!";
@@ -51,89 +64,11 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen> {
       }
     } catch (e) {
       setState(() {
-        _status = "Error occurred during fingerprint authentication: $e";
+        _status = "Error during fingerprint authentication: $e";
       });
     } finally {
       setState(() {
         _isProcessing = false;
-      });
-    }
-  }
-
-  // Authenticate using face recognition
-  Future<void> _authenticateFace() async {
-    try {
-      setState(() {
-        _isProcessing = true;
-        _status = "Authenticating with face recognition...";
-      });
-
-      // Start face authentication
-      final authenticated = await auth.authenticate(
-        localizedReason: 'Scan your face to continue',
-        options: const AuthenticationOptions(
-          stickyAuth: true, // Keep the authentication until successful or canceled
-        ),
-      );
-
-      if (authenticated) {
-        setState(() {
-          _faceAuthDone = true;
-          _status = "Face authentication successful!";
-        });
-
-        // If face is done, check for fingerprint authentication
-        if (_fingerprintAuthDone) {
-          Navigator.pop(context, true); // Return true if both are done
-        }
-      } else {
-        setState(() {
-          _status = "Face authentication failed!";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _status = "Error occurred during face authentication: $e";
-      });
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
-
-  // Check for available biometrics (fingerprint and face)
-  Future<void> _checkBiometrics() async {
-    try {
-      final availableBiometrics = await auth.getAvailableBiometrics();
-      print("Available biometrics: $availableBiometrics");
-
-      if (availableBiometrics.isEmpty) {
-        setState(() {
-          _status = "No biometric methods available.";
-        });
-        return;
-      }
-
-      if (availableBiometrics.contains(BiometricType.fingerprint)) {
-        await _authenticateFingerprint();
-      }
-
-      if (availableBiometrics.contains(BiometricType.face)) {
-        await _authenticateFace();
-        setState(() {
-          _status = _fingerprintAuthDone
-              ? "Fingerprint done! Now authenticate with face."
-              : "Fingerprint available. Please authenticate.";
-        });
-      } else {
-        setState(() {
-          _status += "\nNote: Face recognition not available.";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _status = "Error checking biometrics: $e";
       });
     }
   }
@@ -141,56 +76,104 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen> {
   @override
   void initState() {
     super.initState();
-    _checkBiometrics(); // Check biometrics availability on screen load
+    _lottieController = AnimationController(vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _lottieController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Biometric Authentication")),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Biometric Authentication"),
+        centerTitle: true,
+        backgroundColor: Colors.deepPurpleAccent,
+      ),
       body: Center(
-        child: _isProcessing
-            ? Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 20),
-            Text(_status, textAlign: TextAlign.center),
-          ],
-        )
-            : Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(_status, textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-
-            // 🔘 Show fingerprint button if not yet done
-            if (!_fingerprintAuthDone && !_faceAuthDone)
-              ElevatedButton(
-                onPressed: _authenticateFingerprint,
-                child: const Text("Authenticate with Fingerprint"),
-              ),
-
-            // 🔘 Show face button if fingerprint is done but face is not
-            if (_fingerprintAuthDone && !_faceAuthDone)
-              ElevatedButton(
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FaceAuthScreen(aadhaar: widget.aadhaar),
-                    ),
-                  );
-
-                  // Optional: check result from FaceAuthScreen
-
-
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'assets/animations/finger.json',
+                controller: _lottieController,
+                onLoaded: (composition) {
+                  if (!_playedInitial) {
+                    final firstHalf = 85 / composition.durationFrames;
+                    _lottieController.animateTo(
+                      firstHalf,
+                      duration: const Duration(seconds: 2),
+                    );
+                    _playedInitial = true;
+                  }
                 },
-                child: Text("Proceed to Face Verification"),
+                width: 200,
+                height: 200,
+                fit: BoxFit.contain,
               ),
-          ],
+              const SizedBox(height: 30),
+              Text(
+                _status,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // 🔵 Show fingerprint verification button if not done
+              if (!_fingerprintAuthDone)
+                ElevatedButton(
+                  onPressed: _authenticateFingerprint,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurpleAccent,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    "Start Fingerprint Verification",
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+
+              // 🟢 After fingerprint is done, show Face Verification button
+              if (_fingerprintAuthDone)
+                ElevatedButton(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FaceAuthScreen(aadhaar: widget.aadhaar,election:widget.election),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    "Proceed to Face Verification",
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+
 }

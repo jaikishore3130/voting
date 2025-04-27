@@ -4,6 +4,7 @@ import 'package:voting/screens/voter/vote_now_screen.dart';
 import 'package:voting/screens/voter/results_screen.dart';
 import 'package:voting/screens/voter/candidates_screen.dart';
 import 'package:voting/screens/voter/feedback_screen.dart';
+import 'package:voting/screens/voter_login_screen.dart'; // Make sure this import is correct
 
 class VoterDashboard extends StatefulWidget {
   final String aadhaarNumber;
@@ -30,7 +31,7 @@ class _VoterDashboardState extends State<VoterDashboard> {
   void initState() {
     super.initState();
     _screens = [
-      VoteNowScreen(aadhaar:widget.aadhaarNumber),
+      VoteNowScreen(aadhaar: widget.aadhaarNumber),
       ResultsScreen(),
       HomeScreen(aadhaarNumber: widget.aadhaarNumber), // ✅ Correct usage
       CandidatesScreen(),
@@ -38,10 +39,30 @@ class _VoterDashboardState extends State<VoterDashboard> {
     ];
   }
 
+  // Logout function
+  void _logout() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VoterLoginScreen(userType: 'voter'),
+      ),
+          (Route<dynamic> route) => false, // Remove all previous routes so the user can't go back
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[_currentIndex])),
+      appBar: AppBar(
+        title: Text(_titles[_currentIndex]),
+        actions: [
+          if (_currentIndex == 2) // Only show logout button in Home screen
+            IconButton(
+              icon: Icon(Icons.logout),
+              onPressed: _logout,
+            ),
+        ],
+      ),
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,

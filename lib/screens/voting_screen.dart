@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:voting/screens/voter/vote_now_screen.dart';
+import 'package:voting/screens/voter/voter_dashboard.dart';
 
 class VotingScreen extends StatefulWidget {
   final Map<String, dynamic> election;
@@ -22,7 +23,6 @@ class _VotingScreenState extends State<VotingScreen> {
   Map<String, dynamic>? selectedCandidate;
   String? selectedElectionId;
   List<Map<String, dynamic>> candidates = [];
-  String? selectedCandidates;
 
   @override
   void initState() {
@@ -273,55 +273,150 @@ class _VotingScreenState extends State<VotingScreen> {
   Future<void> _submitVote(Map<String, dynamic> candidate, String electionId) async {
     try {
       final firestore = FirebaseFirestore.instance;
+
+      // Fetch all candidates for the voter's constituency
+      List<Map<String, dynamic>> candidates = await _fetchAllCandidates(electionId);
+
+      // Find the candidate who was selected by the user
+      Map<String, dynamic>? selectedCandidate = candidates.firstWhere(
+            (c) => c['aadhaar'] == candidate['aadhaar'],
+        orElse: () {
+          throw Exception("Candidate not found.");
+        },
+      );
+      print(selectedCandidate);
+
+      // Check if selectedCandidate is null
+      if (selectedCandidate == null) {
+        _showMessage("The selected candidate is not valid for your constituency.");
+        return;
+      }
+
       final voteDocRef = firestore
           .collection('votes')
-          .doc(widget.election['id'])
+          .doc(selectedElectionId)
           .collection('voters')
           .doc(widget.aadhaar);
 
       final voteSnapshot = await voteDocRef.get();
 
+      // Check if the user has already voted
       if (voteSnapshot.exists) {
         _showMessage("You have already voted.");
         return;
       }
 
-      // Encrypt vote and user details
-      final encryptedVote = _encryptVote(candidate['aadhaar']);
-      final encryptedUser = _encryptUser(widget.aadhaar);
-
-      // Start a Firestore transaction to handle vote count update
+      // Firestore transaction for atomic operations
       await firestore.runTransaction((transaction) async {
-        // Create vote record
-        transaction.set(voteDocRef, {
-          'election_id': widget.election["id"],
-          'candidate_id': encryptedVote,
-          'user_id': encryptedUser,
-          'timestamp': FieldValue.serverTimestamp(),
-          'visible': false, // Hide until polling ends
-        });
+        // Debugging print
+        print('Selected Candidate Aadhaar: ${selectedCandidate?['aadhaar']}');
 
-        // Get candidate reference
-        final candidateRef = firestore.collection('candidates').doc(candidate['aadhaar']);
+        // Reference to candidate's vote count and the election's total votes
+        final candidateDocRef = firestore
+            .collection('election_status')
+            .doc('lok')
+            .collection(selectedElectionId!)
+            .doc('party')
+            .collection('list')
+            .doc(selectedCandidate?['party'])
+            .collection('candidates')
+            .doc(selectedCandidate?['aadhaar']);
 
-        // Get current vote count
-        final candidateSnapshot = await transaction.get(candidateRef);
+        final electionDocRef = firestore.collection('election_status')
+            .doc('lok_sabha') // Ensure this path is correct
+            .collection(selectedElectionId!) // Ensure this ID is correct
+            .doc('election_info');
+
+        print("Candidate Doc Ref: $candidateDocRef");
+        print("Election Doc Ref: $electionDocRef");
+
+        // Get current candidate data and election data
+        final candidateSnapshot = await transaction.get(candidateDocRef);
+        final electionSnapshot = await transaction.get(electionDocRef);
+
+        print('Candidate Snapshot Exists: ${candidateSnapshot.exists}');
+        print('Election Snapshot Exists: ${electionSnapshot.exists}');
 
         if (!candidateSnapshot.exists) {
-          throw Exception("Candidate not found");
+          print("❌ Candidate not found.");
+          throw Exception("Candidate not found.");
         }
 
-        // Increment vote count using Firestore's atomic operation
-        final currentVoteCount = candidateSnapshot.data()?['vote_count'] ?? 0;
-        transaction.update(candidateRef, {
-          'vote_count': FieldValue.increment(1),
-        });
+        if (!electionSnapshot.exists) {
+          print("❌ Election not found.");
+          throw Exception("Election not found.");
+        }
+
+        // Check the election status before updating vote count
+        final electionStatus = electionSnapshot.data()?['status'];
+
+        if (electionStatus == 'completed') {
+          // Get current vote count for the candidate and total votes for the election
+          final currentVoteCount = candidateSnapshot.data()?['vote_count'] ?? 0;
+          final totalVotes = electionSnapshot.data()?['total_votes'] ?? 0;
+
+          // Encrypt vote and user details
+          final encryptedVote = _encryptVote(selectedCandidate?['aadhaar']);
+          final encryptedUser = _encryptUser(widget.aadhaar);
+
+          // Update the candidate's vote count and the election's total votes
+          transaction.update(candidateDocRef, {
+            'vote_count': currentVoteCount + 1, // Increment vote count for the candidate
+          });
+
+          transaction.update(electionDocRef, {
+            'total_votes': totalVotes + 1, // Increment total votes for the election
+          });
+
+          // Store the vote in the votes collection
+          transaction.set(voteDocRef, {
+            'election_id': widget.election["id"],
+            'candidate_id': encryptedVote,
+            'user_id': encryptedUser,
+            'timestamp': FieldValue.serverTimestamp(),
+            'visible': false, // Hide until polling ends
+            'voted': true,
+          });
+        } else {
+          // If election status is not completed, don't update vote count
+          _showMessage("Voting is not allowed until the election is completed.");
+          return;
+        }
       });
 
+      // Show success message and a dialog
       _showMessage("✅ Vote submitted successfully!");
 
+      // Show a popup dialog
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text("Vote Submitted"),
+            content: Text("Your vote has been successfully submitted."),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  // Close the dialog and navigate to the home page
+                  Navigator.pop(context); // Close the dialog
+
+                  // Use pushReplacement to navigate to the home page and prevent back navigation
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => VoterDashboard(aadhaarNumber: widget.aadhaar)),
+                        (Route<dynamic> route) => false, // This will remove all the previous routes
+                  );
+                },
+                child: Text("Go to Home Page"),
+              ),
+            ],
+          );
+        },
+      );
+
       setState(() {
-        selectedCandidates = null;
+        // Reset the selected candidate after voting
+        selectedCandidate = null;
       });
     } catch (e) {
       print("❌ Error submitting vote: $e");
@@ -336,8 +431,14 @@ class _VotingScreenState extends State<VotingScreen> {
 
   String _encryptUser(String userId) {
     // TODO: Replace with secure encryption
-    return "user_${userId.hashCode}";
+    return "user_$userId";
   }
+  final Map<String, dynamic> notaCandidate = {
+    'name': 'NOTA',
+    'party': 'None',
+    'aadhaar': 'NOTA',
+  };
+
 
   Future<void> _showMessage(String msg, {bool popAfter = false}) async {
     await showDialog(
@@ -361,17 +462,6 @@ class _VotingScreenState extends State<VotingScreen> {
       Navigator.of(context).pop(); // Pop VotingScreen itself
     }
   }
-
-
-
-  final Map<String, dynamic> notaCandidate = {
-    'name': 'NOTA',
-    'party': 'None',
-    'aadhaar': 'NOTA',
-  };
-
-
-
 
 
 }

@@ -289,7 +289,35 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
   void _showElectionPopup({
     required Map<String, dynamic> election,
     required bool isOngoing,
-  }) {
+  }) async {
+    // Print election details for debugging
+    print(election);
+
+    final firestore = FirebaseFirestore.instance;
+
+    // Reference to the voter's Firestore document using their Aadhaar number
+    final voterDocRef = firestore
+        .collection('votes')
+        .doc(election['election_id'])
+        .collection('voters')
+        .doc(widget.aadhaar);
+
+    // Fetch the voter's document to check if they have voted
+    final voterSnapshot = await voterDocRef.get();
+
+    bool hasVoted = false;
+
+    // Check if the voter's document exists and if they have already voted
+    if (voterSnapshot.exists) {
+      final voterData = voterSnapshot.data();
+      if (voterData != null && voterData['voted'] == true) {
+        hasVoted = true;  // Voter has already voted
+      }
+      print(voterData);
+    }
+
+
+    // Show the election popup dialog
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -305,7 +333,7 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
                 children: [
                   Expanded(
                     child: Text(
-                      election['election_type'] ?? 'Election',
+                      election['election_id'] ?? 'Election',
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -316,7 +344,14 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
                 ],
               ),
               const SizedBox(height: 20),
-              if (isOngoing)
+              if (hasVoted)
+              // If the voter has already voted, show the message instead of the vote button
+                Text(
+                  'You have already submitted your vote.',
+                  style: const TextStyle(fontSize: 16, color: Colors.red),
+                )
+              else if (isOngoing)
+              // If the election is ongoing and the voter has not voted yet, show the "Vote Now" button
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF073C6A),
@@ -326,6 +361,7 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
                     ),
                   ),
                   onPressed: () async {
+                    // Show instructions dialog before proceeding
                     final proceed = await showDialog(
                       context: context,
                       builder: (context) => const VotingInstructionsDialog(),
@@ -334,22 +370,35 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
                     if (proceed == true) {
                       final loginSuccess = await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) =>  ReLoginWithOtpScreen(userType: 'voting',)),
+                        MaterialPageRoute(
+                          builder: (_) => ReLoginWithOtpScreen(userType: 'voting'),
+                        ),
                       );
 
                       if (loginSuccess == true) {
+                        // Proceed with biometric authentication
                         final biometricSuccess = await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => BiometricAuthScreen(aadhaar: widget.aadhaar)),
-                        );
-
-                        Navigator.push(
-                          context,
                           MaterialPageRoute(
-                            builder: (_) => VotingScreen(election: election, aadhaar: widget.aadhaar), // Pass the entire map
+                            builder: (_) => BiometricAuthScreen(
+                              aadhaar: widget.aadhaar,
+                              election: election,
+                            ),
                           ),
                         );
 
+                        if (biometricSuccess == true) {
+                          // Navigate to the voting screen after biometric authentication
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => VotingScreen(
+                                election: election,
+                                aadhaar: widget.aadhaar,
+                              ),
+                            ),
+                          );
+                        }
                       }
                     }
                   },
@@ -369,7 +418,7 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
                 ),
                 onPressed: () {
                   Navigator.pop(context);
-                  _showCandidates(election);
+                  _showCandidates(election);  // Show candidates list
                 },
                 child: const Text(
                   'Show Candidates',
@@ -380,13 +429,13 @@ class _VoteNowScreenState extends State<VoteNowScreen> with SingleTickerProvider
                   ),
                 ),
               ),
-
             ],
           ),
         ),
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {

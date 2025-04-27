@@ -8,12 +8,15 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:camera/camera.dart';
+import 'package:lottie/lottie.dart';
+import 'package:voting/screens/voting_screen.dart';
 
 
 class FaceAuthScreen extends StatefulWidget {
   final String aadhaar;
+  final Map<String, dynamic> election;  // Changed static to instance variable
 
-  const FaceAuthScreen({Key? key, required this.aadhaar}) : super(key: key);
+  const FaceAuthScreen({Key? key, required this.aadhaar, required this.election}) : super(key: key);
 
   @override
   _FaceAuthScreenState createState() => _FaceAuthScreenState();
@@ -25,57 +28,69 @@ class _FaceAuthScreenState extends State<FaceAuthScreen> {
   CameraController? _controller;
   late List<CameraDescription> _cameras;
   bool _isCameraInitialized = false;
-  String? _decryptedFaceImageBase64; // Saved decrypted face (Base64)
+  String? _decryptedFaceImageBase64;
+  bool _showCamera = true; // 👈 Manage camera visibility
 
   @override
   void initState() {
     super.initState();
     _initializeCamera();
-    _fetchAndDecryptFace(); // 👈 Fetch encrypted face URL from Firestore and decrypt
+    _fetchAndDecryptFace();
   }
 
-  // Initialize camera
   Future<void> _initializeCamera() async {
     _cameras = await availableCameras();
-    final CameraDescription frontCamera = _cameras.firstWhere(
+    final frontCamera = _cameras.firstWhere(
           (camera) => camera.lensDirection == CameraLensDirection.front,
     );
     _controller = CameraController(frontCamera, ResolutionPreset.medium);
     await _controller?.initialize();
     setState(() {
       _isCameraInitialized = true;
+      _showCamera = true;
     });
   }
 
-  // Fetch encrypted face from Firestore, download, decrypt
+  Future<void> _disposeCamera() async {
+    await _controller?.dispose();
+    _controller = null;
+    setState(() {
+      _isCameraInitialized = false;
+      _showCamera = false;
+    });
+  }
+
   Future<void> _fetchAndDecryptFace() async {
     try {
       final snapshot = await FirebaseFirestore.instance.collection('voters').doc(widget.aadhaar).get();
-      final faceUrl = snapshot['face']; // Assuming face field stores GitHub or Firebase Storage URL
+      final faceUrl = snapshot['face'];
 
       if (faceUrl != null) {
-        // Download encrypted image
         final response = await http.get(Uri.parse(faceUrl));
         if (response.statusCode == 200) {
           final encryptedBytes = response.bodyBytes;
-
-          // Decrypt the image (Assuming AES decryption method available)
           final decryptedBytes = await AESHelper.decrypt(encryptedBytes);
 
-          // Convert to Base64
           setState(() {
             _decryptedFaceImageBase64 = base64Encode(decryptedBytes);
+            _isLoading = false; // 👈 Set loading false after fetching
           });
         } else {
           print('Failed to download encrypted face image');
+          setState(() {
+            _isLoading = false;
+          });
         }
       }
     } catch (e) {
       print('❌ Error fetching and decrypting face: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  // Capture image from the camera
+
   Future<void> _captureImage() async {
     if (!_isCameraInitialized) return;
     try {
@@ -87,7 +102,6 @@ class _FaceAuthScreenState extends State<FaceAuthScreen> {
     }
   }
 
-  // Start face verification
   Future<void> _startVerification(String liveImagePath) async {
     if (_decryptedFaceImageBase64 == null) {
       print("❌ Decrypted face image not available yet!");
@@ -107,8 +121,20 @@ class _FaceAuthScreenState extends State<FaceAuthScreen> {
 
     setState(() {
       _isLoading = false;
-      _statusMessage =
-      result ? '✅ Face Verified' : '❌ Face Not Verified';
+      _statusMessage = result ? '✅ Face Verified' : '❌ Invalid Face';
+    });
+
+    if (result) {
+      await _disposeCamera(); // 👈 Close camera on success
+    } else {
+      await _disposeCamera(); // 👈 Also close camera on failure
+    }
+  }
+
+  Future<void> _retryCapture() async {
+    await _initializeCamera(); // 👈 Reopen the camera
+    setState(() {
+      _statusMessage = '';
     });
   }
 
@@ -132,9 +158,43 @@ class _FaceAuthScreenState extends State<FaceAuthScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (_isLoading) const CircularProgressIndicator(),
+                if (_isLoading)
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 1500), // transition time
+                    transitionBuilder: (child, animation) {
+                      // spiral + shrink + fade
+                      return FadeTransition(
+                        opacity: animation,
+                        child: RotationTransition(
+                          turns: Tween<double>(begin: 0, end: 5).animate(animation),
+                          child: ScaleTransition(
+                            scale: animation,
+                            child: child,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Column(
+                      key: const ValueKey('loadingAnimation'), // important for switch
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Lottie.asset(
+                          'assets/animations/face.json',
+                          width: screenWidth * 0.6,
+                          height: screenWidth * 0.6,
+                          fit: BoxFit.cover,
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          "Verifying face...",
+                          style: TextStyle(fontSize: 18),
+                        ),
+                      ],
+                    ),
+                  )
 
-                if (!_isLoading && _isCameraInitialized)
+
+                else if (!_isLoading && _showCamera && _isCameraInitialized)
                   Column(
                     children: [
                       SizedBox(
@@ -157,15 +217,72 @@ class _FaceAuthScreenState extends State<FaceAuthScreen> {
                 SizedBox(height: screenHeight * 0.04),
 
                 if (_statusMessage.isNotEmpty)
-                  Text(
-                    _statusMessage,
-                    style: TextStyle(
-                      fontSize: screenWidth * 0.045,
-                      color: _statusMessage.contains('✅')
-                          ? Colors.green
-                          : Colors.red,
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 500),
+                    child: Text(
+                      _statusMessage,
+                      key: ValueKey<String>(_statusMessage),
+                      style: TextStyle(
+                        fontSize: screenWidth * 0.05,
+                        color: _statusMessage.contains('✅') ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
+                  ),
+
+                if (_statusMessage.contains('✅'))
+                  Column(
+                    children: [
+                      const Icon(Icons.verified_user, color: Colors.green, size: 100),
+                      SizedBox(height: screenHeight * 0.02),
+                      SizedBox(
+                        width: screenWidth * 0.6,
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => VotingScreen(aadhaar: widget.aadhaar, election:widget.election),
+                              ),
+                            );
+                          },
+                          child: const Text("Cast Your Vote", style: TextStyle(fontSize: 18)),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (_statusMessage.contains('❌'))
+                  Column(
+                    children: [
+                      const Icon(Icons.error, color: Colors.red, size: 100),
+                      SizedBox(height: screenHeight * 0.02),
+                      Text(
+                        "Face Not Matched!",
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.045,
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: screenHeight * 0.03),
+                      SizedBox(
+                        width: screenWidth * 0.6,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _retryCapture,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                          ),
+                          child: const Text("Retry", style: TextStyle(fontSize: 18)),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -175,6 +292,7 @@ class _FaceAuthScreenState extends State<FaceAuthScreen> {
     );
   }
 }
+
 
 class FaceAuthService {
   static const String _serverUrl = 'https://jaikishore0130-buzz.hf.space/verify-face';

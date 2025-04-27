@@ -122,6 +122,7 @@ class _VoterLoginState extends State<VoterLoginScreen> {
                   userType: widget.userType, // Adjust this based on the user type (voter, candidate, ec_employee)
                 ),
           ),
+
         );
       } else {
         _showMessage("Invalid Aadhaar details! Contact EC.");
