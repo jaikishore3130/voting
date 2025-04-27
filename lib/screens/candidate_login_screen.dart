@@ -69,6 +69,9 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
       final electionStatusRef = FirebaseFirestore.instance
           .collection('election_status')
           .doc('lok_sabha');
+      final electionRef = FirebaseFirestore.instance
+          .collection('election_status')
+          .doc('lok');
 
       // Step 1: Fetch all election subcollection IDs from /election_control/central_election_info
       final centralElectionInfoDoc = await FirebaseFirestore.instance
@@ -111,7 +114,7 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
       if (selectedElectionId.isEmpty) return null;
 
       // Step 3: Get party list from the selected election and check each party
-      final partyListDoc = await electionStatusRef
+      final partyListDoc = await electionRef
           .collection(selectedElectionId)
           .doc('party')
           .collection('list')
@@ -121,7 +124,8 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
         final partyId = partyDoc.id;  // This would be the party ID (e.g., 'AAM', 'BJP', etc.)
 
         // Check candidates under the current party
-        final candidateDoc = await electionStatusRef
+        print(electionRef);
+        final candidateDoc = await electionRef
             .collection(selectedElectionId)
             .doc('party')
             .collection('list')
@@ -129,7 +133,7 @@ class _CandidateLoginScreenState extends State<CandidateLoginScreen> {
             .collection('candidates')
             .doc(aadhaar)
             .get();
-
+print(candidateDoc);
         if (candidateDoc.exists) {
           final data = candidateDoc.data();
           data?['party'] = partyId;  // Add the party ID to the data

@@ -468,7 +468,7 @@ class _NominationScreenState extends State<NominationScreen> {
       'name': _nameController.text,
       'father_name': _fatherNameController.text,
       'mother_name': _motherNameController.text,
-      'dob': _dobController.text,
+      'age': _calculatedAge,
       'education': _educationController.text,
       'address': _addressController.text,
       'phone_number': _phoneController.text,

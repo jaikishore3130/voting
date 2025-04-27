@@ -53,6 +53,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final electionStatusRef = FirebaseFirestore.instance
           .collection('election_status')
           .doc('lok_sabha');
+      final electionRef = FirebaseFirestore.instance
+          .collection('election_status')
+          .doc('lok');
 
       // Step 1: Fetch all election subcollection IDs from /election_control/central_election_info
       final centralElectionInfoDoc = await FirebaseFirestore.instance
@@ -94,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (selectedElectionId.isEmpty) return null;
 
-      final partyListDoc = await electionStatusRef
+      final partyListDoc = await electionRef
           .collection(selectedElectionId)
           .doc('party')
           .collection('list')
@@ -106,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Check for candidates and return data
       for (final partyDoc in partyListDoc.docs) {
         final partyId = partyDoc.id;
-        final candidateDoc = await electionStatusRef
+        final candidateDoc = await electionRef
             .collection(selectedElectionId)
             .doc('party')
             .collection('list')

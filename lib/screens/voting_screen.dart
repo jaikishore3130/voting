@@ -346,42 +346,57 @@ class _VotingScreenState extends State<VotingScreen> {
           print("❌ Election not found.");
           throw Exception("Election not found.");
         }
+// Encrypt vote and user details
+        final encryptedVote = _encryptVote(selectedCandidate?['aadhaar']);
+        final encryptedUser = _encryptUser(widget.aadhaar);
 
         // Check the election status before updating vote count
         final electionStatus = electionSnapshot.data()?['status'];
 
-        if (electionStatus == 'completed') {
-          // Get current vote count for the candidate and total votes for the election
-          final currentVoteCount = candidateSnapshot.data()?['vote_count'] ?? 0;
-          final totalVotes = electionSnapshot.data()?['total_votes'] ?? 0;
+        // Inside the Firestore transaction...
 
-          // Encrypt vote and user details
-          final encryptedVote = _encryptVote(selectedCandidate?['aadhaar']);
-          final encryptedUser = _encryptUser(widget.aadhaar);
+        if (electionStatus == 'ongoing') {
+          // Election is ongoing, add vote to pending_votes instead of vote_count
+          final currentPendingVotes = candidateSnapshot.data()?['pending_votes'] ?? 0;
 
-          // Update the candidate's vote count and the election's total votes
           transaction.update(candidateDocRef, {
-            'vote_count': currentVoteCount + 1, // Increment vote count for the candidate
+            'pending_votes': currentPendingVotes + 1,
           });
 
-          transaction.update(electionDocRef, {
-            'total_votes': totalVotes + 1, // Increment total votes for the election
-          });
-
-          // Store the vote in the votes collection
+          // Save the encrypted vote
           transaction.set(voteDocRef, {
             'election_id': widget.election["id"],
             'candidate_id': encryptedVote,
             'user_id': encryptedUser,
             'timestamp': FieldValue.serverTimestamp(),
-            'visible': false, // Hide until polling ends
+            'visible': false,
             'voted': true,
           });
+
+          _showMessage("✅ Vote submitted successfully!");
+
+        } else if (electionStatus == 'completed') {
+          // Election completed, normal behavior (direct update)
+          final currentVoteCount = candidateSnapshot.data()?['vote_count'] ?? 0;
+          final currentPendingVotes = candidateSnapshot.data()?['pending_votes'] ?? 0;
+          final totalVotes = electionSnapshot.data()?['total_votes'] ?? 0;
+
+          // Merge pending_votes into vote_count
+          transaction.update(candidateDocRef, {
+            'vote_count': currentVoteCount + currentPendingVotes,
+            'pending_votes': 0, // Reset pending_votes
+          });
+
+          transaction.update(electionDocRef, {
+            'total_votes': totalVotes + currentPendingVotes,
+          });
+
+          _showMessage("✅ Election finalized. Votes have been counted.");
         } else {
-          // If election status is not completed, don't update vote count
-          _showMessage("Voting is not allowed until the election is completed.");
+          _showMessage("Voting is not allowed right now.");
           return;
         }
+
       });
 
       // Show success message and a dialog
