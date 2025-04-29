@@ -1,6 +1,32 @@
 # 🗳️ Online Voting App
 
-This is a Flutter-based secure **Online Voting App** built as a demo for Aadhaar-based voting. It includes features like OTP-based login, nomination uploads (photo and video), admin panel, and optional face verification (using a Python-based backend).
+This is a Flutter-based secure Online Voting App built as a demo for Aadhaar-based digital elections in India. It showcases a full-stack implementation of a voting system tailored for transparency and security, especially for government-scale deployments.
+
+## 🔐 Key Features
+Aadhaar-based role-based login system (Voter, Candidate, EC Employee/Admin)
+
+Three-factor authentication for voting:
+
+OTP verification (via Twilio)
+
+Face recognition (Python + HuggingFace hosted server)
+
+Local biometric authentication (e.g., fingerprint or face unlock)
+
+Nomination system: Candidates can upload video and photo via GitHub integration
+
+Admin panel (Election Commission Employee) to:
+
+Create/manage elections
+
+Approve or reject nominations
+
+View and monitor voting activity
+
+Firebase Firestore used for real-time data handling
+
+No public registration – voters/candidates must be pre-registered manually via Aadhaar number in Firestore
+
 
 > 🔐 **Note**: This project was developed for educational/demo purposes and cannot be run directly unless proper API keys and authentication services are configured.
 
