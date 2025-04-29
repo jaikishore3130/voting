@@ -63,14 +63,10 @@ Setup your Firebase project and integrate the config in main.dart
 
 Configure Twilio keys and GitHub token in the respective files
 
-Run the app using:
-
-bash
-Copy
-Edit
-flutter pub get
-flutter run
-📸 Screenshots
+**Run the app using:**
+  flutter pub get
+  flutter run
+**###📸 Screenshots**
 
 ![IMG-20250427-WA0003](https://github.com/user-attachments/assets/ea11d8f2-3aaf-4445-a6f6-4ab9e71e7d8c)
 
