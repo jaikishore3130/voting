@@ -66,7 +66,7 @@ Configure Twilio keys and GitHub token in the respective files
 **Run the app using:**
   flutter pub get
   flutter run
-###📸 Screenshots
+##📸 Screenshots
 
 ![IMG-20250427-WA0003](https://github.com/user-attachments/assets/ea11d8f2-3aaf-4445-a6f6-4ab9e71e7d8c)
 
@@ -99,4 +99,114 @@ Configure Twilio keys and GitHub token in the respective files
 This project was built for demo purposes. It does not allow registration and is based on a closed Aadhaar-style structure. It’s not production-ready and is not authorized for actual Aadhaar integration. The source code is shared for learning and portfolio showcasing.
 
 📫 Contact
-If you have questions or want to understand the structure before replicating, feel free to reach out on [your email or LinkedIn].
+If you have questions or want to understand the structure before replicating, feel free to reach out on [E-Mail-jaikishore.333.raju@gmail or Linkedin-https://www.linkedin.com/in/jai-kishore-raju31?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app ].
+📁 firebase_structure.md
+markdown
+Copy
+Edit
+# 🔥 Firebase Firestore Structure for Online Voting App
+
+To make this app work, users must set up their **own Firebase project** and replicate the database structure outlined below. The app does **not allow new user registrations** — Aadhaar-based users must be manually added to Firestore. OTP, face authentication, and candidate nomination also rely on external services you must configure separately.
+
+---
+
+## 📂 Firestore Collections & Document Structure
+
+### 1. `/voters/{aadhaar_number}`
+- Stores voter details using Aadhaar as the document ID.
+
+#### Example:
+```json
+{
+  "name": "John Doe",
+  "aadhaar": "644854219657",
+  "phone": "+91XXXXXXXXXX",
+  "dob": "1999-01-01",
+  "hasVoted": false,
+  "verified": true
+}
+```
+2. /election_status/lok/lok_sabha_04-24-2025_12-09-26/party/list/BJP/candidates/{aadhaar_number}
+Stores candidate nomination info under party-wise sub-collections.
+
+Example:
+```json
+
+{
+  "name": "Jane Smith",
+  "aadhaar": "644854219657",
+  "party": "BJP",
+  "constituency": "XYZ",
+  "photo_url": "GitHub image link",
+  "video_url": "GitHub video link"
+}
+```
+3. /election_status/lok_sabha/lok_sabha_04-19-2024/election_info
+Contains information about a specific election session.
+
+Example:
+```json
+
+{
+  "status": "active",
+  "start_date": "2024-04-19",
+  "end_date": "2024-04-24",
+  "type": "Lok Sabha"
+}
+```
+4. /EC_EMPLOYEES/{employee_aadhaar}
+Election Commission employee login data.
+
+Example:
+```json
+
+{
+  "name": "EC Officer",
+  "aadhaar": "007054726553",
+  "role": "ec",
+  "verified": true
+}
+```
+⚠️ Important Notes
+You must manually add users and EC employees to Firestore. No new registration flow is provided in the app.
+
+Make sure to match the structure exactly or the app will not function correctly.
+
+🔧 Services & Tokens You Must Setup
+✅ Firebase
+Create your own Firebase project.
+
+Replace google-services.json and reconfigure in your app.
+
+✅ OTP (Twilio)
+Used in relogin_screen.dart and otp_screen.dart
+
+You must configure:
+
+TWILIO_AUTH_TOKEN
+
+TWILIO_API_KEY
+
+TWILIO_PHONE_NUMBER
+
+✅ GitHub Token (for nominee image/video uploads)
+Required for uploading nominee photos/videos in nominate_screen.dart
+
+✅ Face Authentication Server
+Python-based server for face detection
+
+Hosted by default on HuggingFace (Free Tier)
+
+You may host your own using provided Python script.
+
+📌 Deployment Tips
+Clone the repo
+
+Replace Firebase credentials
+
+Setup Firestore as per the above structure
+
+Configure Twilio and GitHub tokens
+
+Optional: Deploy your own face authentication server
+
