@@ -60,9 +60,9 @@ class _OtpScreenState extends State<OtpScreen> {
   void initState() {
     super.initState();
     twilioFlutter = TwilioFlutter(
-      accountSid: 'YOUR_ACCOUNT_SID',
-      authToken: 'YOUR_AUTHTOKEN',
-      twilioNumber: 'YOUR_TWILIONUMBER',
+      accountSid: 'ACaed6ccb2e9fc43139eb9b1c7083142c5',
+      authToken: 'f453689ed29a302fb9e48a593388c1ed',
+      twilioNumber: '+19289108707',
 
     );
     _generateNewOtp();

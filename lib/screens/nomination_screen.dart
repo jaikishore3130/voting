@@ -136,8 +136,8 @@ class _NominationScreenState extends State<NominationScreen> {
   }
 
   Future<String?> uploadToGitHub(File file, String filename) async {
-    final token = 'YOUR_GIT_TOKEN';
-    final repoOwner = 'YOUR_GITUSERNAME';
+    final token = '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';
+    final repoOwner = 'jaikishore3130';
     final repoName = 'encrypted-profile-images';
 
     final url = 'https://api.github.com/repos/$repoOwner/$repoName/contents/$filename';
