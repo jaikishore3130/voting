@@ -180,7 +180,7 @@ print(candidateDoc);
 
     String? phone =
     data['phone_number']!= null ?"+91${data['phone_number']}":null;
-    int? age = int.tryParse(data['AGE'].toString());
+    int? age = int.tryParse(data['age'].toString());
 
     if (phone == null || age == null) {
       _showMessage("Incomplete candidate record.");

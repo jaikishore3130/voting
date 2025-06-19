@@ -4,7 +4,8 @@ import 'package:voting/screens/voter/vote_now_screen.dart';
 import 'package:voting/screens/voter/results_screen.dart';
 import 'package:voting/screens/voter/candidates_screen.dart';
 import 'package:voting/screens/voter/feedback_screen.dart';
-import 'package:voting/screens/voter_login_screen.dart'; // Make sure this import is correct
+import 'package:voting/screens/authentication_screen.dart'; // Make sure this import is correct
+
 
 class VoterDashboard extends StatefulWidget {
   final String aadhaarNumber;
@@ -44,7 +45,7 @@ class _VoterDashboardState extends State<VoterDashboard> {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (context) => VoterLoginScreen(userType: 'voter'),
+        builder: (context) => AuthenticationScreen(),
       ),
           (Route<dynamic> route) => false, // Remove all previous routes so the user can't go back
     );
